@@ -10,6 +10,7 @@ from uipath_sdk._cli.middlewares import MiddlewareResult
 from ._runtime._context import UiPathMcpRuntimeContext
 from ._runtime._exception import UiPathMcpRuntimeError
 from ._runtime._runtime import UiPathMcpRuntime
+from ._utils._config import McpConfig
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -18,13 +19,10 @@ load_dotenv()
 def mcp_run_middleware(
     entrypoint: Optional[str], input: Optional[str], resume: bool
 ) -> MiddlewareResult:
-    print("Hello")
     """Middleware to handle MCP server execution"""
-    config = {
-        "path": entrypoint,
-        "exists": True,
-    }
-    if not config["exists"]:
+
+    config = McpConfig()
+    if not config.exists:
         return MiddlewareResult(
             should_continue=True
         )  # Continue with normal flow if no mcp.json
@@ -35,7 +33,7 @@ def mcp_run_middleware(
             context = UiPathMcpRuntimeContext.from_config(
                 env.get("UIPATH_CONFIG_PATH", "uipath.json")
             )
-
+            context.config = config
             context.entrypoint = entrypoint
             context.input = input
             context.resume = resume
@@ -55,7 +53,6 @@ def mcp_run_middleware(
                 folder_key=env.get("UIPATH_FOLDER_KEY"),
             )
 
-            # Add default env variables
             env["UIPATH_REQUESTING_PRODUCT"] = "uipath-python-sdk"
             env["UIPATH_REQUESTING_FEATURE"] = "mcp-server"
 

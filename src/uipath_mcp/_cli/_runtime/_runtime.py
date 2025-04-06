@@ -11,6 +11,7 @@ from uipath_sdk._cli._runtime._contracts import (
     UiPathRuntimeResult,
 )
 
+from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext
 from ._exception import UiPathMcpRuntimeError
 
@@ -26,6 +27,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     def __init__(self, context: UiPathMcpRuntimeContext):
         super().__init__(context)
         self.context: UiPathMcpRuntimeContext = context
+        self.server: Optional[McpServer] = None
 
     async def execute(self) -> Optional[UiPathRuntimeResult]:
         """
@@ -42,13 +44,16 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         try:
 
+            if self.server is None:
+                return None
+
             server_params = StdioServerParameters(
-                command="python",
-                args=["mcp_server.py"],
+                command=self.server.command,
+                args=self.server.args,
                 env=None,
             )
 
-            print("Starting MCP server..")
+            print(f"Starting MCP server.. {self.server.command} {self.server.args}")
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(
                     read, write
@@ -102,7 +107,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def validate(self) -> None:
         """Validate runtime inputs."""
         """Load and validate the MCP server configuration ."""
-        pass
+        self.server = self.context.config.get_server(self.context.entrypoint)
+        if not self.server:
+            raise UiPathMcpRuntimeError(
+                "SERVER_NOT_FOUND",
+                "MCP server not found",
+                f"Server '{self.context.entrypoint}' not found in configuration",
+                UiPathErrorCategory.DEPLOYMENT,
+            )
 
     async def cleanup(self):
         pass
