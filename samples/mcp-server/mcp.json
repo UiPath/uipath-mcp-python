@@ -1,9 +1,33 @@
 {
   "servers": {
-    "my-mcp-server": {
+    "my-python-server": {
         "type": "stdio",
         "command": "python",
         "args": ["server.py"]
+    },
+    "my-python-server2": {
+        "type": "stdio",
+        "command": "python",
+        "args": ["server2.py"]
+    },
+    "fetch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "my-node-server": {
+      "command": "npx",
+      "args": ["-y", "mcp-server"],
+      "env": {
+        "API_KEY": "value"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
     }
   }
 }
