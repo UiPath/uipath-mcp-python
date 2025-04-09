@@ -2,12 +2,12 @@
 name = "uipath-mcp"
 version = "0.0.1"
 description = "UiPath MCP SDK"
-readme = { file = "../README.md", content-type = "text/markdown" }
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 dependencies = [
     "mcp==1.6.0",
     "pysignalr==1.2.0",
-    "uipath-sdk==0.0.101",
+    "uipath==2.0.1",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -22,7 +22,7 @@ maintainers = [
     { name = "Cristian Pufu", email = "cristian.pufu@uipath.com" }
 ]
 
-[project.entry-points."uipath_sdk.middlewares"]
+[project.entry-points."uipath.middlewares"]
 register = "uipath_mcp.middlewares:register_middleware"
 
 [project.urls]
@@ -32,12 +32,6 @@ Repository = "https://github.com/UiPath/uipath-mcp-python"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["uipath_mcp"]
-
-[tool.hatch.build.targets.sdist]
-packages = ["uipath_mcp"]
 
 [dependency-groups]
 dev = [

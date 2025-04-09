@@ -1,4 +1,4 @@
-from uipath_sdk._cli.middlewares import Middlewares
+from uipath._cli.middlewares import Middlewares
 
 from ._cli.cli_init import mcp_init_middleware
 from ._cli.cli_run import mcp_run_middleware

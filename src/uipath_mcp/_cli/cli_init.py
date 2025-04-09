@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 
-from uipath_sdk._cli.middlewares import MiddlewareResult
+from uipath._cli.middlewares import MiddlewareResult
 
 from ._utils._config import McpConfig
 
