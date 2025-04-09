@@ -5,7 +5,7 @@ from typing import Optional
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from uipath_sdk._cli._runtime._contracts import (
+from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
     UiPathRuntimeResult,
