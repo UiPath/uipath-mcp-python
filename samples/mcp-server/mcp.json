@@ -5,11 +5,6 @@
         "command": "python",
         "args": ["server.py"]
     },
-    "my-python-server2": {
-        "type": "stdio",
-        "command": "python",
-        "args": ["server2.py"]
-    },
     "fetch": {
       "type": "stdio",
       "command": "uvx",
