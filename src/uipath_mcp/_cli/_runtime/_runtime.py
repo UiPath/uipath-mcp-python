@@ -5,6 +5,7 @@ from typing import Optional
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
@@ -75,14 +76,51 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     #resources = await session.list_resources()
 
                     # List available tools
-                    tools = await session.list_tools()
+                    toolsResult = await session.list_tools()
 
-                    print(tools)
-                    # Read a resource
-                    #content, mime_type = await session.read_resource("file://some/path")
+                    print(toolsResult)
 
-                    # Call a tool
-                    #result = await session.call_tool("tool-name", arguments={"arg1": "value"})
+                    # Register with UiPath MCP Server
+                    client_info = {
+                        "server": {
+                            "Name": self.server.name,
+                            "Slug": self.server.name,
+                            "Version": "1.0.0",
+                            "Type": 1
+                        },
+                        "tools": []
+                    }
+
+                    for tool in toolsResult.tools:
+                        tool_info = {
+                            "Type": 1,
+                            "Name": tool.name,
+                            "ProcessType": "Tool",
+                            "Description": tool.description,
+                        }
+                        client_info["tools"].append(tool_info)
+
+                    print(client_info)
+                    print("Registering client...")
+
+                    uipath = UiPath()
+                    sseUrl: str
+                    try:
+                        response = uipath.api_client.request(
+                            "POST",
+                            f"/mcp_/api/servers-with-tools/{self.server.name}",
+                            json=client_info,
+                        )
+                        #data = response.json()
+                        #sseUrl = data.get("url")
+                        print("Registered client successfully")
+                    except Exception as e:
+                        raise UiPathMcpRuntimeError(
+                            "NETWORK_ERROR",
+                            "Failed to register with UiPath MCP Server",
+                            str(e),
+                            UiPathErrorCategory.SYSTEM,
+                        ) from e
 
             return UiPathRuntimeResult()
 
