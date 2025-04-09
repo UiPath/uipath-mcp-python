@@ -32,6 +32,7 @@ UIPATH_ACCESS_TOKEN=YOUR_TOKEN_HERE
 ### Servers Definition
 
 ```json
+// mcp.json
 {
   "servers": {
     "my-python-server": {

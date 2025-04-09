@@ -1,0 +1,32 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "my-python-server",
+            "uniqueId": "06abc49c-b74d-4f33-83c9-99af1e115577",
+            "type": "agent",
+            "input": {},
+            "output": {}
+        },
+        {
+            "filePath": "fetch",
+            "uniqueId": "417b6586-5fd3-4a92-9c4e-45a7f82e0ca3",
+            "type": "agent",
+            "input": {},
+            "output": {}
+        },
+        {
+            "filePath": "my-node-server",
+            "uniqueId": "c7365a81-4036-47e2-a19e-8f9f412975bf",
+            "type": "agent",
+            "input": {},
+            "output": {}
+        },
+        {
+            "filePath": "sequential-thinking",
+            "uniqueId": "956de7aa-b5e1-4858-a4f1-afeac2b8df4b",
+            "type": "agent",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
