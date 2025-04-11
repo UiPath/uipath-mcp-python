@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import os
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from pysignalr.client import SignalRClient
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
@@ -15,6 +17,7 @@ from uipath._cli._runtime._contracts import (
 from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext
 from ._exception import UiPathMcpRuntimeError
+from ._session import SessionServer
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +32,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         super().__init__(context)
         self.context: UiPathMcpRuntimeContext = context
         self.server: Optional[McpServer] = None
+        self.signalr_client: Optional[SignalRClient] = None
+        self.session_servers: Dict[str, SessionServer] = {}
 
     async def execute(self) -> Optional[UiPathRuntimeResult]:
         """
-        Start the MCP server.
+        Start the runtime and connect to SignalR.
 
         Returns:
             Dictionary with execution results
@@ -40,87 +45,30 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Raises:
             UiPathMcpRuntimeError: If execution fails
         """
-
         await self.validate()
 
         try:
-
             if self.server is None:
                 return None
 
-            server_params = StdioServerParameters(
-                command=self.server.command,
-                args=self.server.args,
-                env=None,
+            # Set up SignalR client
+            signalr_url = (
+                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}"
             )
 
-            print(f"Starting MCP server.. {self.server.command} {self.server.args}")
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(
-                    read, write
-                ) as session:
+            self.signalr_client = SignalRClient(signalr_url)
+            self.signalr_client.on("MessageReceived", self.handle_signalr_message)
+            self.signalr_client.on_error(self.handle_signalr_error)
+            self.signalr_client.on_open(self.handle_signalr_open)
+            self.signalr_client.on_close(self.handle_signalr_close)
 
-                    print("Connected to MCP server")
-                    # Initialize the connection
-                    await session.initialize()
-                    print("MCP server initialized")
-                    # List available prompts
-                    #prompts = await session.list_prompts()
+            # Register the server with UiPath MCP Server
+            await self._register()
 
-                    # Get a prompt
-                    #prompt = await session.get_prompt(
-                    #    "example-prompt", arguments={"arg1": "value"}
-                    #)
-
-                    # List available resources
-                    #resources = await session.list_resources()
-
-                    # List available tools
-                    toolsResult = await session.list_tools()
-
-                    print(toolsResult)
-
-                    # Register with UiPath MCP Server
-                    client_info = {
-                        "server": {
-                            "Name": self.server.name,
-                            "Slug": self.server.name,
-                            "Version": "1.0.0",
-                            "Type": 1
-                        },
-                        "tools": []
-                    }
-
-                    for tool in toolsResult.tools:
-                        tool_info = {
-                            "Type": 1,
-                            "Name": tool.name,
-                            "ProcessType": "Tool",
-                            "Description": tool.description,
-                        }
-                        client_info["tools"].append(tool_info)
-
-                    print(client_info)
-                    print("Registering client...")
-
-                    uipath = UiPath()
-                    sseUrl: str
-                    try:
-                        response = uipath.api_client.request(
-                            "POST",
-                            f"/mcp_/api/servers-with-tools/{self.server.name}",
-                            json=client_info,
-                        )
-                        #data = response.json()
-                        #sseUrl = data.get("url")
-                        print("Registered client successfully")
-                    except Exception as e:
-                        raise UiPathMcpRuntimeError(
-                            "NETWORK_ERROR",
-                            "Failed to register with UiPath MCP Server",
-                            str(e),
-                            UiPathErrorCategory.SYSTEM,
-                        ) from e
+            # Keep the runtime alive
+            # Start SignalR client and keep it running (this is a blocking call)
+            logger.info("Starting SignalR client...")
+            await self.signalr_client.run()
 
             return UiPathRuntimeResult()
 
@@ -132,19 +80,16 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             raise UiPathMcpRuntimeError(
                 "EXECUTION_ERROR",
-                "MCP Server execution failed",
+                "MCP Runtime execution failed",
                 detail,
                 UiPathErrorCategory.USER,
             ) from e
 
         finally:
-            # Add a small delay to allow the server to shut down gracefully
-            if sys.platform == 'win32':
-                await asyncio.sleep(0.1)
+            await self.cleanup()
 
     async def validate(self) -> None:
-        """Validate runtime inputs."""
-        """Load and validate the MCP server configuration ."""
+        """Validate runtime inputs and load MCP server configuration."""
         self.server = self.context.config.get_server(self.context.entrypoint)
         if not self.server:
             raise UiPathMcpRuntimeError(
@@ -154,5 +99,124 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.DEPLOYMENT,
             )
 
-    async def cleanup(self):
-        pass
+    async def handle_signalr_message(self, args: list) -> None:
+        """
+        Handle incoming SignalR messages.
+        The SignalR client will call this with the arguments from the server.
+        """
+        if len(args) < 2:
+            logger.error(f"Received invalid SignalR message arguments: {args}")
+            return
+
+        session_id = args[0]
+        message = args[1]
+
+        logger.info(f"Received message for session {session_id}: {message}")
+
+        try:
+            # Check if we have a session server for this session_id
+            if session_id not in self.session_servers:
+                # Create and start a new session server
+                session_server = SessionServer(self.server, session_id)
+                self.session_servers[session_id] = session_server
+                await session_server.start(self.signalr_client)
+
+            # Get the session server for this session
+            session_server = self.session_servers[session_id]
+
+            # Forward the message to the session's MCP server
+            await session_server.send_message(message)
+
+        except Exception as e:
+            logger.error(
+                f"Error handling SignalR message for session {session_id}: {str(e)}"
+            )
+
+    async def handle_signalr_error(self, error: Any) -> None:
+        """Handle SignalR errors."""
+        logger.error(f"SignalR error: {error}")
+
+    async def handle_signalr_open(self) -> None:
+        """Handle SignalR connection open event."""
+        logger.info("SignalR connection established")
+
+    async def handle_signalr_close(self) -> None:
+        """Handle SignalR connection close event."""
+        logger.info("SignalR connection closed")
+
+        # Clean up all session servers when the connection closes
+        await self.cleanup()
+
+    async def _register(self) -> None:
+        """Register the MCP server type with UiPath."""
+        logger.info(f"Registering MCP server type: {self.server.name}")
+
+        try:
+            # Create a temporary session to get tools
+            server_params = StdioServerParameters(
+                command=self.server.command,
+                args=self.server.args,
+                env=None,
+            )
+
+            # Start a temporary stdio client to get tools
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools_result = await session.list_tools()
+                    print(tools_result)
+                    client_info = {
+                        "server": {
+                            "Name": self.server.name,
+                            "Slug": self.server.name,
+                            "Version": "1.0.0",
+                            "Type": 1,
+                        },
+                        "tools": [],
+                    }
+
+                    for tool in tools_result.tools:
+                        tool_info = {
+                            "Type": 1,
+                            "Name": tool.name,
+                            "ProcessType": "Tool",
+                            "Description": tool.description,
+                        }
+                        client_info["tools"].append(tool_info)
+
+                    # Register with UiPath MCP Server
+                    uipath = UiPath()
+                    uipath.api_client.request(
+                        "POST",
+                        f"mcp_/api/servers-with-tools/{self.server.name}",
+                        json=client_info,
+                    )
+                    logger.info("Registered MCP Server type successfully")
+
+        except Exception as e:
+            raise UiPathMcpRuntimeError(
+                "NETWORK_ERROR",
+                "Failed to register with UiPath MCP Server",
+                str(e),
+                UiPathErrorCategory.SYSTEM,
+            ) from e
+
+    async def cleanup(self) -> None:
+        """Clean up all resources."""
+        logger.info("Cleaning up all resources")
+
+        # Clean up all session servers
+        for session_id, session_server in list(self.session_servers.items()):
+            try:
+                await session_server.cleanup()
+            except Exception as e:
+                logger.error(f"Error cleaning up session {session_id}: {str(e)}")
+
+        self.session_servers.clear()
+
+        # Close SignalR connection
+        # self.signalr_client
+
+        # Add a small delay to allow the server to shut down gracefully
+        if sys.platform == "win32":
+            await asyncio.sleep(0.1)
