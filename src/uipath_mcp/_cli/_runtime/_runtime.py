@@ -176,6 +176,27 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def handle_signalr_open(self) -> None:
         """Handle SignalR connection open event."""
         logger.info("SignalR connection established")
+        uipath = UiPath()
+        response = uipath.api_client.request(
+            "GET",
+            f"mcp_/mcp/{self.server.name}/message?jobKey={self.context.job_id}"
+        )
+        if response.status_code == 200:
+            data = response.json()
+            session_id = data["sessionId"]
+            message = data["message"]
+            logger.info(f"Received message from UiPath MCP: {message}")
+            if session_id not in self.session_servers:
+                # Create and start a new session server
+                session_server = SessionServer(self.server, session_id)
+                self.session_servers[session_id] = session_server
+                await session_server.start(self.signalr_client)
+
+            # Get the session server for this session
+            session_server = self.session_servers[session_id]
+
+            # Forward the message to the session's MCP server
+            await session_server.send_message(message)
 
     async def handle_signalr_close(self) -> None:
         """Handle SignalR connection close event."""
