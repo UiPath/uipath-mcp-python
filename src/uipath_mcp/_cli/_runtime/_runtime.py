@@ -53,11 +53,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Set up SignalR client
             signalr_url = (
-                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}"
+                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}&jobKey={self.context.job_id}"
             )
+
+            self.cancel_event = asyncio.Event()
 
             self.signalr_client = SignalRClient(signalr_url)
             self.signalr_client.on("MessageReceived", self.handle_signalr_message)
+            self.signalr_client.on("SessionClosed", self.handle_signalr_session_closed)
             self.signalr_client.on_error(self.handle_signalr_error)
             self.signalr_client.on_open(self.handle_signalr_open)
             self.signalr_client.on_close(self.handle_signalr_close)
@@ -68,7 +71,21 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Keep the runtime alive
             # Start SignalR client and keep it running (this is a blocking call)
             logger.info("Starting SignalR client...")
-            await self.signalr_client.run()
+
+            run_task = asyncio.create_task(self.signalr_client.run())
+
+            # Set up a task to wait for cancellation
+            cancel_task = asyncio.create_task(self.cancel_event.wait())
+
+            # Wait for either the run to complete or cancellation
+            done, pending = await asyncio.wait(
+                [run_task, cancel_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Cancel any pending tasks
+            for task in pending:
+                task.cancel()
 
             return UiPathRuntimeResult()
 
@@ -97,6 +114,26 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 "MCP server not found",
                 f"Server '{self.context.entrypoint}' not found in configuration",
                 UiPathErrorCategory.DEPLOYMENT,
+            )
+
+    async def handle_signalr_session_closed(self, args: list) -> None:
+        """
+        Handle session closed by server.
+        """
+        if len(args) < 1:
+            logger.error(f"Received invalid SignalR message arguments: {args}")
+            return
+
+        session_id = args[0]
+
+        logger.info(f"Received closed signal for session {session_id}")
+
+        try:
+            self.cancel_event.set()
+
+        except Exception as e:
+            logger.error(
+                f"Error terminating session {session_id}: {str(e)}"
             )
 
     async def handle_signalr_message(self, args: list) -> None:
@@ -214,8 +251,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         self.session_servers.clear()
 
-        # Close SignalR connection
-        # self.signalr_client
+        if self.signalr_client:
+            # Close the SignalR connection
+            await self.signalr_client._transport._ws.close()
 
         # Add a small delay to allow the server to shut down gracefully
         if sys.platform == "win32":
