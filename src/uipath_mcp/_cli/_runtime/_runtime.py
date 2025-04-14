@@ -273,9 +273,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         self.session_servers.clear()
 
-        if self.signalr_client:
-            # Close the SignalR connection
-            await self.signalr_client._transport._ws.close()
+        if self.signalr_client and hasattr(self.signalr_client, "_transport"):
+            transport = self.signalr_client._transport
+            if transport and hasattr(transport, "_ws") and transport._ws:
+                try:
+                    await transport._ws.close()
+                except Exception as e:
+                    logger.error(f"Error closing SignalR WebSocket: {str(e)}")
 
         # Add a small delay to allow the server to shut down gracefully
         if sys.platform == "win32":
