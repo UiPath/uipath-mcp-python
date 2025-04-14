@@ -69,7 +69,16 @@ class McpConfig:
         return list(self._servers.values())
 
     def get_server(self, name: str) -> Optional[McpServer]:
-        """Get a server model by name."""
+        """
+        Get a server model by name.
+        If there's only one server available, return that one regardless of name.
+        Otherwise, look up the server by the provided name.
+        """
+        # If there's only one server, return it
+        if len(self._servers) == 1:
+            return next(iter(self._servers.values()))
+
+        # Otherwise, fall back to looking up by name
         return self._servers.get(name)
 
     def get_server_names(self) -> List[str]:
