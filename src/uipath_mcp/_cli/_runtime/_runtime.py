@@ -58,7 +58,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             self.cancel_event = asyncio.Event()
 
-            self.signalr_client = SignalRClient(signalr_url)
+            self.signalr_client = SignalRClient(signalr_url, headers={
+                "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
+                "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+            })
             self.signalr_client.on("MessageReceived", self.handle_signalr_message)
             self.signalr_client.on("SessionClosed", self.handle_signalr_session_closed)
             self.signalr_client.on_error(self.handle_signalr_error)
