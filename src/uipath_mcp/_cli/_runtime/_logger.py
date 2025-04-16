@@ -1,7 +1,7 @@
 import os
 
 
-class LoggerAdapter:
+class NullLogger:
     def __init__(self):
         self.devnull = open(os.devnull, "w")
 

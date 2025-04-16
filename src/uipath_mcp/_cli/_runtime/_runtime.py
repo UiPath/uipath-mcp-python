@@ -14,6 +14,7 @@ from uipath._cli._runtime._contracts import (
     UiPathErrorCategory,
     UiPathRuntimeResult,
 )
+from uipath.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext
@@ -58,7 +59,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             self.cancel_event = asyncio.Event()
 
-            with tracer.start_as_current_span("MCP Server") as root_span:
+            with tracer.start_as_current_span(self.server.name) as root_span:
                 root_span.set_attribute("session_id", self.server.session_id)
                 root_span.set_attribute("command", self.server.command)
                 root_span.set_attribute("args", self.server.args)
@@ -115,6 +116,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             ) from e
 
         finally:
+            wait_for_tracers()
             await self.cleanup()
 
     async def validate(self) -> None:
