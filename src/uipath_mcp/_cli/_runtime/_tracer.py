@@ -36,7 +36,7 @@ class McpTracer:
         root_value = message.root
 
         if isinstance(root_value, types.JSONRPCRequest):
-            span = self.tracer.start_span(root_value.method)
+            span = self.tracer.start_span(f"{root_value.method} [{root_value.id}]")
             span.set_attribute("type", "request")
             span.set_attribute("id", str(root_value.id))
             span.set_attribute("method", root_value.method)
@@ -49,13 +49,13 @@ class McpTracer:
             self._add_notification_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCResponse):
-            span = self.tracer.start_span("response")
+            span = self.tracer.start_span(f"response [{root_value.id}]")
             span.set_attribute("type", "response")
             span.set_attribute("id", str(root_value.id))
             self._add_response_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCError):
-            span = self.tracer.start_span("error")
+            span = self.tracer.start_span(f"error [{root_value.id}]")
             span.set_attribute("type", "error")
             span.set_attribute("id", str(root_value.id))
             span.set_attribute("error_code", root_value.error.code)
@@ -83,6 +83,7 @@ class McpTracer:
             if request.method == "tools/call" and isinstance(request.params, dict):
                 if "name" in request.params:
                     span.set_attribute("tool_name", request.params["name"])
+                    span.update_name(f"{request.method}/{request.params['name']} [{request.id}]")
                 if "arguments" in request.params and isinstance(
                     request.params["arguments"], dict
                 ):

@@ -189,7 +189,7 @@ class SessionServer:
                     json=message.model_dump(),
                 )
 
-                span.set_attribute("http.status_code", response.status_code)
+                span.set_attribute("http_status_code", response.status_code)
 
                 if response.status_code == 202:
                     logger.info(
