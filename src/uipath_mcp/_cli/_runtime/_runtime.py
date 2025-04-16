@@ -52,16 +52,17 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 return None
 
             # Set up SignalR client
-            signalr_url = (
-                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}&sessionId={self.server.session_id}"
-            )
+            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}&sessionId={self.server.session_id}"
 
             self.cancel_event = asyncio.Event()
 
-            self.signalr_client = SignalRClient(signalr_url, headers={
-                "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
-                "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
-            })
+            self.signalr_client = SignalRClient(
+                signalr_url,
+                headers={
+                    "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
+                    "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+                },
+            )
             self.signalr_client.on("MessageReceived", self.handle_signalr_message)
             self.signalr_client.on("SessionClosed", self.handle_signalr_session_closed)
             self.signalr_client.on_error(self.handle_signalr_error)
@@ -82,8 +83,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Wait for either the run to complete or cancellation
             done, pending = await asyncio.wait(
-                [run_task, cancel_task],
-                return_when=asyncio.FIRST_COMPLETED
+                [run_task, cancel_task], return_when=asyncio.FIRST_COMPLETED
             )
 
             # Cancel any pending tasks
@@ -135,9 +135,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             self.cancel_event.set()
 
         except Exception as e:
-            logger.error(
-                f"Error terminating session {session_id}: {str(e)}"
-            )
+            logger.error(f"Error terminating session {session_id}: {str(e)}")
 
     async def handle_signalr_message(self, args: list) -> None:
         """
@@ -158,13 +156,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 # Create and start a new session server
                 session_server = SessionServer(self.server, session_id)
                 self.session_servers[session_id] = session_server
-                await session_server.start(self.signalr_client)
+                await session_server.start()
 
             # Get the session server for this session
             session_server = self.session_servers[session_id]
 
             # Forward the message to the session's MCP server
-            await session_server.get_messages()
+            await session_server.get_incoming_messages()
 
         except Exception as e:
             logger.error(
@@ -182,9 +180,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         if self.server.session_id:
             try:
                 session_server = SessionServer(self.server, self.server.session_id)
-                await session_server.start(self.signalr_client)
+                await session_server.start()
                 self.session_servers[self.server.session_id] = session_server
-                await session_server.get_messages()
+                await session_server.get_incoming_messages()
             except Exception as e:
                 logger.error(f"Error starting session server: {str(e)}")
 
