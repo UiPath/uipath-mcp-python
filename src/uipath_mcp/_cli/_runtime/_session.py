@@ -6,10 +6,11 @@ from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 from opentelemetry import trace
 from uipath import UiPath
-from uipath.tracing import traced, wait_for_tracers
+from uipath.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
 from ._logger import LoggerAdapter
+from ._tracer import McpTracer
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -28,6 +29,7 @@ class SessionServer:
         self.context_task = None
         self._message_queue = asyncio.Queue()
         self._uipath = UiPath()
+        self._mcp_tracer = McpTracer(tracer, logger)
 
     async def start(self) -> None:
         """Start the server process in a separate task."""
@@ -59,39 +61,33 @@ class SessionServer:
         """Run the server in proper context managers."""
         logger.info(f"Starting server process for session {self.session_id}")
         try:
-            stderr_adapter = LoggerAdapter(logger)
-            with tracer.start_as_current_span(self.server_config.name) as root_span:
-                root_span.set_attribute("session_id", self.session_id)
-                root_span.set_attribute(
-                    "server_params", server_params.model_dump_json()
-                )
-                async with stdio_client(server_params, errlog=stderr_adapter) as (
-                    read,
-                    write,
-                ):
-                    self.read_stream, self.write_stream = read, write
-                    logger.info(f"Session {self.session_id} - stdio client started")
+            stderr_null = LoggerAdapter(logger)
 
-                    logger.info(f"Session {self.session_id} - MCP session initialized")
+            async with stdio_client(server_params, errlog=stderr_null) as (
+                read,
+                write,
+            ):
+                self.read_stream, self.write_stream = read, write
+                logger.info(f"Session {self.session_id} - stdio client started")
 
-                    # Start the message consumer task
-                    consumer_task = asyncio.create_task(self._consume_messages())
+                # Start the message consumer task
+                consumer_task = asyncio.create_task(self._consume_messages())
 
-                    # Process incoming messages from the server
+                # Process incoming messages from the server
+                try:
+                    while True:
+                        print("Waiting for messages...")
+                        message = await self.read_stream.receive()
+                        json_str = message.model_dump_json()
+                        print(f"Received message from local server: {json_str}")
+                        await self.send_outgoing_message(message)
+                finally:
+                    # Cancel the consumer when we exit the loop
+                    consumer_task.cancel()
                     try:
-                        while True:
-                            print("Waiting for messages...")
-                            message = await self.read_stream.receive()
-                            json_str = message.model_dump_json()
-                            print(f"Received message from local server: {json_str}")
-                            await self.send_outgoing_message(message)
-                    finally:
-                        # Cancel the consumer when we exit the loop
-                        consumer_task.cancel()
-                        try:
-                            await consumer_task
-                        except asyncio.CancelledError:
-                            pass
+                        await consumer_task
+                    except asyncio.CancelledError:
+                        pass
 
         except Exception as e:
             logger.error(
@@ -163,7 +159,6 @@ class SessionServer:
         await self._message_queue.put(message)
         logger.debug(f"Session {self.session_id} - message queued for processing")
 
-    @traced()
     async def get_incoming_messages(self) -> None:
         """Get new messages from UiPath MCP Server."""
         response = self._uipath.api_client.request(
@@ -175,23 +170,37 @@ class SessionServer:
             for message in messages:
                 logger.info(f"Incoming message from UiPath MCP Server: {message}")
                 json_message = types.JSONRPCMessage.model_validate(message)
-                logger.info(f"Forwarding message to local MCP Server: {message}")
-                await self.send_message(json_message)
+                with self._mcp_tracer.create_span_for_message(
+                        json_message,
+                        session_id=self.session_id,
+                        server_name=self.server_config.name
+                    ) as _:
+                    logger.info(f"Forwarding message to local MCP Server: {message}")
+                    await self.send_message(json_message)
 
-    @traced()
     async def send_outgoing_message(self, message: types.JSONRPCMessage) -> None:
         """Send new message to UiPath MCP Server."""
-        response = self._uipath.api_client.request(
-            "POST",
-            f"mcp_/mcp/{self.server_config.name}/out/message?sessionId={self.session_id}",
-            json=message.model_dump(),
-        )
-        if response.status_code == 202:
-            logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
-        else:
-            logger.error(
-                f"Failed to send outgoing message to UiPath MCP Server: {response.status_code} {response.text}"
-            )
+        with self._mcp_tracer.create_span_for_message(
+            message,
+            session_id=self.session_id,
+            server_name=self.server_config.name
+        ) as span:
+            try:
+                response = self._uipath.api_client.request(
+                    "POST",
+                    f"mcp_/mcp/{self.server_config.name}/out/message?sessionId={self.session_id}",
+                    json=message.model_dump(),
+                )
+
+                span.set_attribute("http.status_code", response.status_code)
+
+                if response.status_code == 202:
+                    logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
+                else:
+                    self._mcp_tracer.record_http_error(span, response.status_code, response.text)
+            except Exception as e:
+                self._mcp_tracer.record_exception(span, e)
+                raise
 
     async def cleanup(self) -> None:
         """Clean up resources and stop the server."""
