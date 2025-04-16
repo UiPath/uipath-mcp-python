@@ -169,7 +169,7 @@ class SessionServer:
         response = self._uipath.api_client.request(
             "POST",
             f"mcp_/mcp/{self.server_config.name}/out/message?sessionId={self.session_id}",
-            json=message,
+            json=message.model_dump_json(),
         )
         if response.status_code == 202:
             logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
