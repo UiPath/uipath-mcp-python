@@ -1,13 +1,13 @@
 [project]
 name = "uipath-mcp"
-version = "0.0.18"
+version = "0.0.19"
 description = "UiPath MCP SDK"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 dependencies = [
     "mcp==1.6.0",
     "pysignalr==1.2.0",
-    "uipath==2.0.1",
+    "uipath==2.0.11",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
