@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 class McpServer:
     """Model representing an MCP server configuration."""
 
-    def __init__(self, name: str, server_config: Dict[str, Any]):
+    def __init__(self, name: str, server_config: Dict[str, Any], session_id: Optional[str] = None):
         self.name = name
-        self.session_id = server_config.get("sessionId")
+        self.session_id = session_id
         self.type = server_config.get("type")
         self.command = server_config.get("command")
         self.args = server_config.get("args", [])
@@ -53,8 +53,9 @@ class McpConfig:
                 self._raw_config = json.load(f)
 
             servers_config = self._raw_config.get("servers", {})
+            self._session_id = self._raw_config.get("sessionId")
             self._servers = {
-                name: McpServer(name, config)
+                name: McpServer(name, config, self._session_id)
                 for name, config in servers_config.items()
             }
 
