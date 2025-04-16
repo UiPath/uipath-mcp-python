@@ -10,6 +10,7 @@ class McpServer:
 
     def __init__(self, name: str, server_config: Dict[str, Any]):
         self.name = name
+        self.session_id = server_config.get("sessionId")
         self.type = server_config.get("type")
         self.command = server_config.get("command")
         self.args = server_config.get("args", [])

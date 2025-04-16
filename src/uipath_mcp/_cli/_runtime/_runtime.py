@@ -53,7 +53,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Set up SignalR client
             signalr_url = (
-                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}&jobKey={self.context.job_id}"
+                f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self.server.name}&sessionId={self.server.session_id}"
             )
 
             self.cancel_event = asyncio.Event()
@@ -73,7 +73,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Keep the runtime alive
             # Start SignalR client and keep it running (this is a blocking call)
-            logger.info("Starting SignalR client...")
+            logger.info("Starting websocket client...")
 
             run_task = asyncio.create_task(self.signalr_client.run())
 
@@ -144,14 +144,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Handle incoming SignalR messages.
         The SignalR client will call this with the arguments from the server.
         """
-        if len(args) < 2:
+        if len(args) < 1:
             logger.error(f"Received invalid SignalR message arguments: {args}")
             return
 
         session_id = args[0]
-        message = args[1]
 
-        logger.info(f"Received message for session {session_id}: {message}")
+        logger.info(f"Received websocket notification... {session_id}")
 
         try:
             # Check if we have a session server for this session_id
@@ -165,11 +164,11 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             session_server = self.session_servers[session_id]
 
             # Forward the message to the session's MCP server
-            await session_server.send_message(message)
+            await session_server.get_messages()
 
         except Exception as e:
             logger.error(
-                f"Error handling SignalR message for session {session_id}: {str(e)}"
+                f"Error handling websocket notification for session {session_id}: {str(e)}"
             )
 
     async def handle_signalr_error(self, error: Any) -> None:
@@ -178,36 +177,20 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def handle_signalr_open(self) -> None:
         """Handle SignalR connection open event."""
-        logger.info("SignalR connection established")
-        uipath = UiPath()
-        response = uipath.api_client.request(
-            "GET",
-            f"mcp_/mcp/{self.server.name}/message?jobKey={self.context.job_id}"
-        )
-        if response.status_code == 200:
-            data = response.json()
-            session_id = data["sessionId"]
-            message = data["message"]
-            logger.info(f"Received message from UiPath MCP: {data}")
-            if session_id and session_id.strip():
-                if session_id not in self.session_servers:
-                    # Create and start a new session server
-                    session_server = SessionServer(self.server, session_id)
-                    self.session_servers[session_id] = session_server
-                    await session_server.start(self.signalr_client)
 
-                # Get the session server for this session
-                session_server = self.session_servers[session_id]
-
-                if message and message.strip():
-                    logger.info(f"Forwarding message to session {session_id}: {message}")
-                    # Forward the message to the session's MCP server
-                    await session_server.send_message(message)
+        logger.info("Websocket connection established.")
+        if self.server.session_id:
+            try:
+                session_server = SessionServer(self.server, self.server.session_id)
+                await session_server.start(self.signalr_client)
+                self.session_servers[self.server.session_id] = session_server
+                await session_server.get_messages()
+            except Exception as e:
+                logger.error(f"Error starting session server: {str(e)}")
 
     async def handle_signalr_close(self) -> None:
         """Handle SignalR connection close event."""
-        logger.info("SignalR connection closed")
-
+        logger.info("SignalR connection closed.")
         # Clean up all session servers when the connection closes
         await self.cleanup()
 
