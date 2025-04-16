@@ -4,7 +4,6 @@ import logging
 import mcp.types as types
 from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
-from pysignalr.client import SignalRClient
 from uipath import UiPath
 
 from .._utils._config import McpServer
@@ -24,8 +23,9 @@ class SessionServer:
         self.running = False
         self.context_task = None
         self._message_queue = asyncio.Queue()
+        self._uipath = UiPath()
 
-    async def start(self, signalr_client: SignalRClient) -> None:
+    async def start(self) -> None:
         """Start the server process in a separate task."""
         if self.running:
             logger.info(f"Session {self.session_id} already running")
@@ -41,9 +41,7 @@ class SessionServer:
 
             # Start the server process in a separate task
             self.running = True
-            self.context_task = asyncio.create_task(
-                self._run_server(server_params, signalr_client)
-            )
+            self.context_task = asyncio.create_task(self._run_server(server_params))
             self.context_task.add_done_callback(self._on_task_done)
 
         except Exception as e:
@@ -53,9 +51,7 @@ class SessionServer:
             await self.cleanup()
             raise
 
-    async def _run_server(
-        self, server_params: StdioServerParameters, signalr_client: SignalRClient
-    ) -> None:
+    async def _run_server(self, server_params: StdioServerParameters) -> None:
         """Run the server in proper context managers."""
         logger.info(f"Starting server process for session {self.session_id}")
         try:
@@ -75,12 +71,7 @@ class SessionServer:
                         message = await self.read_stream.receive()
                         json_str = message.model_dump_json()
                         print(f"Received message from local server: {json_str}")
-                        logger.debug(
-                            f"Session {self.session_id} - sending to SignalR: {json_str[:100]}..."
-                        )
-                        await signalr_client.send(
-                            "OnMessageReceived", [json_str]
-                        )
+                        await self.send_outgoing_message(message)
                 finally:
                     # Cancel the consumer when we exit the loop
                     consumer_task.cancel()
@@ -159,21 +150,33 @@ class SessionServer:
         await self._message_queue.put(message)
         logger.debug(f"Session {self.session_id} - message queued for processing")
 
-    async def get_messages(self) -> None:
+    async def get_incoming_messages(self) -> None:
         """Get new messages from UiPath MCP Server."""
-        uipath = UiPath()
-        response = uipath.api_client.request(
+        response = self._uipath.api_client.request(
             "GET",
-            f"mcp_/mcp/{self.server_config.name}/messages?sessionId={self.session_id}",
+            f"mcp_/mcp/{self.server_config.name}/in/messages?sessionId={self.session_id}",
         )
         if response.status_code == 200:
             messages = response.json()
-            logger.info(f"Get messages from UiPath MCP Server: {type(messages)} {messages}")
             for message in messages:
-                logger.info(f"Get message from UiPath MCP Server: {type(message)} {message}")
+                logger.info(f"Incoming message from UiPath MCP Server: {message}")
                 json_message = types.JSONRPCMessage.model_validate(message)
                 logger.info(f"Forwarding message to local MCP Server: {message}")
                 await self.send_message(json_message)
+
+    async def send_outgoing_message(self, message: types.JSONRPCMessage) -> None:
+        """Send new message to UiPath MCP Server."""
+        response = self._uipath.api_client.request(
+            "POST",
+            f"mcp_/mcp/{self.server_config.name}/out/message?sessionId={self.session_id}",
+            json=message,
+        )
+        if response.status_code == 202:
+            logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
+        else:
+            logger.error(
+                f"Failed to send outgoing message to UiPath MCP Server: {response.status_code} {response.text}"
+            )
 
     async def cleanup(self) -> None:
         """Clean up resources and stop the server."""
