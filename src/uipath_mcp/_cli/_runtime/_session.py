@@ -5,6 +5,7 @@ import mcp.types as types
 from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 from pysignalr.client import SignalRClient
+from uipath import UiPath
 
 from .._utils._config import McpServer
 
@@ -163,6 +164,20 @@ class SessionServer:
         # Add the message to the queue for processing
         await self._message_queue.put(message)
         logger.debug(f"Session {self.session_id} - message queued for processing")
+
+    async def get_messages(self) -> None:
+        """Get new messages from UiPath MCP Server."""
+        uipath = UiPath()
+        response = uipath.api_client.request(
+            "GET",
+            f"mcp_/mcp/{self.server_config.name}/messages?sessionId={self.session_id}",
+        )
+        if response.status_code == 200:
+            messages = response.json()
+            logger.info(f"Get messages from UiPath MCP Server: {messages}")
+            for message in messages:
+                logger.info(f"Forwarding message to local MCP Server: {message}")
+                await self.send_message(message)
 
     async def cleanup(self) -> None:
         """Clean up resources and stop the server."""
