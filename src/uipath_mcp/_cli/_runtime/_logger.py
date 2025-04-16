@@ -1,4 +1,5 @@
 import logging
+import sys
 
 
 class LoggerAdapter:
@@ -13,3 +14,6 @@ class LoggerAdapter:
 
     def flush(self):
         pass
+
+    def fileno(self):
+        return sys.stderr.fileno()
