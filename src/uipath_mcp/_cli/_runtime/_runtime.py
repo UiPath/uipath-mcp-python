@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from opentelemetry import trace
 from pysignalr.client import SignalRClient
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
@@ -20,6 +21,7 @@ from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class UiPathMcpRuntime(UiPathBaseRuntime):
@@ -56,41 +58,48 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             self.cancel_event = asyncio.Event()
 
-            self.signalr_client = SignalRClient(
-                signalr_url,
-                headers={
-                    "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
-                    "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
-                },
-            )
-            self.signalr_client.on("MessageReceived", self.handle_signalr_message)
-            self.signalr_client.on("SessionClosed", self.handle_signalr_session_closed)
-            self.signalr_client.on_error(self.handle_signalr_error)
-            self.signalr_client.on_open(self.handle_signalr_open)
-            self.signalr_client.on_close(self.handle_signalr_close)
+            with tracer.start_as_current_span("MCP Server") as root_span:
+                root_span.set_attribute("session_id", self.server.session_id)
+                root_span.set_attribute("command", self.server.command)
+                root_span.set_attribute("args", self.server.args)
+                root_span.set_attribute("type", self.server.type)
+                self.signalr_client = SignalRClient(
+                    signalr_url,
+                    headers={
+                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
+                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+                    },
+                )
+                self.signalr_client.on("MessageReceived", self.handle_signalr_message)
+                self.signalr_client.on(
+                    "SessionClosed", self.handle_signalr_session_closed
+                )
+                self.signalr_client.on_error(self.handle_signalr_error)
+                self.signalr_client.on_open(self.handle_signalr_open)
+                self.signalr_client.on_close(self.handle_signalr_close)
 
-            # Register the server with UiPath MCP Server
-            await self._register()
+                # Register the server with UiPath MCP Server
+                await self._register()
 
-            # Keep the runtime alive
-            # Start SignalR client and keep it running (this is a blocking call)
-            logger.info("Starting websocket client...")
+                # Keep the runtime alive
+                # Start SignalR client and keep it running (this is a blocking call)
+                logger.info("Starting websocket client...")
 
-            run_task = asyncio.create_task(self.signalr_client.run())
+                run_task = asyncio.create_task(self.signalr_client.run())
 
-            # Set up a task to wait for cancellation
-            cancel_task = asyncio.create_task(self.cancel_event.wait())
+                # Set up a task to wait for cancellation
+                cancel_task = asyncio.create_task(self.cancel_event.wait())
 
-            # Wait for either the run to complete or cancellation
-            done, pending = await asyncio.wait(
-                [run_task, cancel_task], return_when=asyncio.FIRST_COMPLETED
-            )
+                # Wait for either the run to complete or cancellation
+                done, pending = await asyncio.wait(
+                    [run_task, cancel_task], return_when=asyncio.FIRST_COMPLETED
+                )
 
-            # Cancel any pending tasks
-            for task in pending:
-                task.cancel()
+                # Cancel any pending tasks
+                for task in pending:
+                    task.cancel()
 
-            return UiPathRuntimeResult()
+                return UiPathRuntimeResult()
 
         except Exception as e:
             if isinstance(e, UiPathMcpRuntimeError):

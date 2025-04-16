@@ -1,19 +1,18 @@
-import logging
-import sys
+import os
 
 
 class LoggerAdapter:
-    def __init__(self, logger, level=logging.INFO):
-        self.logger = logger
-        self.level = level
+    def __init__(self):
+        self.devnull = open(os.devnull, "w")
 
     def write(self, message):
-        if message and not message.isspace():
-            self.logger.log(self.level, message.rstrip())
         return len(message)
 
     def flush(self):
-        pass
+        self.devnull.flush()
 
     def fileno(self):
-        return sys.stderr.fileno()
+        return self.devnull.fileno()
+
+    def close(self):
+        self.devnull.close()
