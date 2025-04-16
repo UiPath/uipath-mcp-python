@@ -168,14 +168,10 @@ class SessionServer:
         )
         if response.status_code == 200:
             messages = response.json()
-            logger.info(f"Get messages from UiPath MCP Server: {messages}")
+            logger.info(f"Get messages from UiPath MCP Server: {type(messages)} {messages}")
             for message in messages:
-                if isinstance(message, dict):
-                    json_message = types.JSONRPCMessage.model_validate(message)
-                elif isinstance(message, str):
-                    json_message = types.JSONRPCMessage.model_validate_json(
-                        message
-                    )
+                logger.info(f"Get message from UiPath MCP Server: {type(message)} {message}")
+                json_message = types.JSONRPCMessage.model_validate(message)
                 logger.info(f"Forwarding message to local MCP Server: {message}")
                 await self.send_message(json_message)
 
