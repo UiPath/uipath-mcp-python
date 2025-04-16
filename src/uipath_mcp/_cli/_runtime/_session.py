@@ -123,16 +123,10 @@ class SessionServer:
                 message = await self._message_queue.get()
                 try:
                     if self.write_stream:
-                        if isinstance(message, dict):
-                            json_message = types.JSONRPCMessage.model_validate(message)
-                        elif isinstance(message, str):
-                            json_message = types.JSONRPCMessage.model_validate_json(
-                                message
-                            )
                         logger.info(
-                            f"Session {self.session_id} - processing queued message: {json_message}..."
+                            f"Session {self.session_id} - processing queued message: {message}..."
                         )
-                        await self.write_stream.send(json_message)
+                        await self.write_stream.send(message)
                         logger.info(
                             f"Session {self.session_id} - message sent to local server"
                         )
@@ -153,7 +147,7 @@ class SessionServer:
                 except asyncio.QueueEmpty:
                     break
 
-    async def send_message(self, message: str) -> None:
+    async def send_message(self, message: types.JSONRPCMessage) -> None:
         """Queue a message to be sent to the server."""
         if not self.running:
             logger.warning(
@@ -176,8 +170,14 @@ class SessionServer:
             messages = response.json()
             logger.info(f"Get messages from UiPath MCP Server: {messages}")
             for message in messages:
+                if isinstance(message, dict):
+                    json_message = types.JSONRPCMessage.model_validate(message)
+                elif isinstance(message, str):
+                    json_message = types.JSONRPCMessage.model_validate_json(
+                        message
+                    )
                 logger.info(f"Forwarding message to local MCP Server: {message}")
-                await self.send_message(message)
+                await self.send_message(json_message)
 
     async def cleanup(self) -> None:
         """Clean up resources and stop the server."""
