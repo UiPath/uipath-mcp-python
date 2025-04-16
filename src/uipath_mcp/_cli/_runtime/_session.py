@@ -6,10 +6,9 @@ from mcp import StdioServerParameters
 from mcp.client.stdio import stdio_client
 from opentelemetry import trace
 from uipath import UiPath
-from uipath.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
-from ._logger import LoggerAdapter
+from ._logger import NullLogger
 from ._tracer import McpTracer
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,7 @@ class SessionServer:
         """Run the server in proper context managers."""
         logger.info(f"Starting server process for session {self.session_id}")
         try:
-            stderr_null = LoggerAdapter(logger)
+            stderr_null = NullLogger()
 
             async with stdio_client(server_params, errlog=stderr_null) as (
                 read,
@@ -171,19 +170,17 @@ class SessionServer:
                 logger.info(f"Incoming message from UiPath MCP Server: {message}")
                 json_message = types.JSONRPCMessage.model_validate(message)
                 with self._mcp_tracer.create_span_for_message(
-                        json_message,
-                        session_id=self.session_id,
-                        server_name=self.server_config.name
-                    ) as _:
+                    json_message,
+                    session_id=self.session_id,
+                    server_name=self.server_config.name,
+                ) as _:
                     logger.info(f"Forwarding message to local MCP Server: {message}")
                     await self.send_message(json_message)
 
     async def send_outgoing_message(self, message: types.JSONRPCMessage) -> None:
         """Send new message to UiPath MCP Server."""
         with self._mcp_tracer.create_span_for_message(
-            message,
-            session_id=self.session_id,
-            server_name=self.server_config.name
+            message, session_id=self.session_id, server_name=self.server_config.name
         ) as span:
             try:
                 response = self._uipath.api_client.request(
@@ -195,9 +192,13 @@ class SessionServer:
                 span.set_attribute("http.status_code", response.status_code)
 
                 if response.status_code == 202:
-                    logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
+                    logger.info(
+                        f"Outgoing message sent to UiPath MCP Server: {message}"
+                    )
                 else:
-                    self._mcp_tracer.record_http_error(span, response.status_code, response.text)
+                    self._mcp_tracer.record_http_error(
+                        span, response.status_code, response.text
+                    )
             except Exception as e:
                 self._mcp_tracer.record_exception(span, e)
                 raise
@@ -229,5 +230,4 @@ class SessionServer:
         self.read_stream = None
         self.write_stream = None
         self.mcp_session = None
-        wait_for_tracers()
         logger.info(f"Cleanup completed for session {self.session_id}")
