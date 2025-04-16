@@ -36,33 +36,33 @@ class McpTracer:
         root_value = message.root
 
         if isinstance(root_value, types.JSONRPCRequest):
-            span = self.tracer.start_span("request")
-            span.set_attribute("jsonrpc.type", "request")
-            span.set_attribute("jsonrpc.id", str(root_value.id))
-            span.set_attribute("jsonrpc.method", root_value.method)
+            span = self.tracer.start_span(root_value.method)
+            span.set_attribute("type", "request")
+            span.set_attribute("id", str(root_value.id))
+            span.set_attribute("method", root_value.method)
             self._add_request_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCNotification):
-            span = self.tracer.start_span("notification")
-            span.set_attribute("jsonrpc.type", "notification")
-            span.set_attribute("jsonrpc.method", root_value.method)
+            span = self.tracer.start_span(root_value.method)
+            span.set_attribute("type", "notification")
+            span.set_attribute("method", root_value.method)
             self._add_notification_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCResponse):
             span = self.tracer.start_span("response")
-            span.set_attribute("jsonrpc.type", "response")
-            span.set_attribute("jsonrpc.id", str(root_value.id))
+            span.set_attribute("type", "response")
+            span.set_attribute("id", str(root_value.id))
             self._add_response_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCError):
             span = self.tracer.start_span("error")
-            span.set_attribute("jsonrpc.type", "error")
-            span.set_attribute("jsonrpc.id", str(root_value.id))
-            span.set_attribute("jsonrpc.error.code", root_value.error.code)
-            span.set_attribute("jsonrpc.error.message", root_value.error.message)
+            span.set_attribute("type", "error")
+            span.set_attribute("id", str(root_value.id))
+            span.set_attribute("error_code", root_value.error.code)
+            span.set_attribute("error_message", root_value.error.message)
         else:
             span = self.tracer.start_span("unknown")
-            span.set_attribute("jsonrpc.unknown_type", str(type(root_value).__name__))
+            span.set_attribute("type", str(type(root_value).__name__))
 
         # Add context attributes
         for key, value in context.items():
@@ -77,17 +77,17 @@ class McpTracer:
         if request.params:
             # Add basic param information
             if isinstance(request.params, dict):
-                span.set_attribute("jsonrpc.params", json.dumps(request.params))
+                span.set_attribute("params", json.dumps(request.params))
 
             # Handle specific request types based on method
             if request.method == "tools/call" and isinstance(request.params, dict):
                 if "name" in request.params:
-                    span.set_attribute("tool.name", request.params["name"])
+                    span.set_attribute("tool_name", request.params["name"])
                 if "arguments" in request.params and isinstance(
                     request.params["arguments"], dict
                 ):
                     span.set_attribute(
-                        "tool.args", json.dumps(request.params["arguments"])
+                        "tool_args", json.dumps(request.params["arguments"])
                     )
 
             # Handle specific tracing for other method types
@@ -95,11 +95,11 @@ class McpTracer:
                 request.params, dict
             ):
                 if "uri" in request.params:
-                    span.set_attribute("resource.uri", str(request.params["uri"]))
+                    span.set_attribute("resource_uri", str(request.params["uri"]))
 
             elif request.method == "prompts/get" and isinstance(request.params, dict):
                 if "name" in request.params:
-                    span.set_attribute("prompt.name", str(request.params["name"]))
+                    span.set_attribute("prompt_name", str(request.params["name"]))
 
     def _add_notification_attributes(
         self, span: Span, notification: types.JSONRPCNotification
@@ -109,7 +109,7 @@ class McpTracer:
             # Add general params attribute
             if isinstance(notification.params, dict):
                 span.set_attribute(
-                    "notification.params", json.dumps(notification.params)
+                    "notification_params", json.dumps(notification.params)
                 )
 
             # Handle specific notification types
@@ -117,18 +117,18 @@ class McpTracer:
                 notification.params, dict
             ):
                 if "uri" in notification.params:
-                    span.set_attribute("resource.uri", str(notification.params["uri"]))
+                    span.set_attribute("resource_uri", str(notification.params["uri"]))
 
             elif notification.method == "notifications/progress" and isinstance(
                 notification.params, dict
             ):
                 if "progress" in notification.params:
                     span.set_attribute(
-                        "progress.value", float(notification.params["progress"])
+                        "progress_value", float(notification.params["progress"])
                     )
                 if "total" in notification.params:
                     span.set_attribute(
-                        "progress.total", float(notification.params["total"])
+                        "progress_total", float(notification.params["total"])
                     )
 
             elif notification.method == "notifications/cancelled" and isinstance(
@@ -136,11 +136,11 @@ class McpTracer:
             ):
                 if "requestId" in notification.params:
                     span.set_attribute(
-                        "cancelled.requestId", str(notification.params["requestId"])
+                        "cancelled_requestId", str(notification.params["requestId"])
                     )
                 if "reason" in notification.params:
                     span.set_attribute(
-                        "cancelled.reason", str(notification.params["reason"])
+                        "cancelled_reason", str(notification.params["reason"])
                     )
 
     def _add_response_attributes(
@@ -149,25 +149,25 @@ class McpTracer:
         """Add response-specific attributes to the span."""
         # Add any relevant attributes from the response result
         if isinstance(response.result, dict):
-            span.set_attribute("jsonrpc.result", json.dumps(response.result))
+            span.set_attribute("result", json.dumps(response.result))
 
     def record_http_error(self, span: Span, status_code: int, text: str) -> None:
         """Record HTTP error details in a span."""
         span.set_status(StatusCode.ERROR, f"HTTP status {status_code}")
-        span.set_attribute("error.type", "http")
-        span.set_attribute("error.status_code", status_code)
+        span.set_attribute("error_type", "http")
+        span.set_attribute("error_status_code", status_code)
         span.set_attribute(
-            "error.message", text[:1000] if text else ""
+            "error_message", text[:1000] if text else ""
         )  # Limit error message length
         self.logger.error(f"HTTP error: {status_code} {text}")
 
     def record_exception(self, span: Span, exception: Exception) -> None:
         """Record exception details in a span."""
         span.set_status(StatusCode.ERROR, str(exception))
-        span.set_attribute("error.type", "exception")
-        span.set_attribute("error.class", exception.__class__.__name__)
+        span.set_attribute("error_type", "exception")
+        span.set_attribute("error_class", exception.__class__.__name__)
         span.set_attribute(
-            "error.message", str(exception)[:1000]
+            "error_message", str(exception)[:1000]
         )  # Limit error message length
         span.record_exception(exception)
         self.logger.error(f"Exception: {exception}", exc_info=True)
