@@ -7,6 +7,7 @@ from mcp.client.stdio import stdio_client
 from uipath import UiPath
 
 from .._utils._config import McpServer
+from ._logger import LoggerAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,11 @@ class SessionServer:
         """Run the server in proper context managers."""
         logger.info(f"Starting server process for session {self.session_id}")
         try:
-            async with stdio_client(server_params) as (read, write):
+            stderr_adapter = LoggerAdapter(logger)
+            async with stdio_client(server_params, errlog=stderr_adapter) as (
+                read,
+                write,
+            ):
                 self.read_stream, self.write_stream = read, write
                 logger.info(f"Session {self.session_id} - stdio client started")
 
