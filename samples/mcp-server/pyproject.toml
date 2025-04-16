@@ -1,10 +1,10 @@
 [project]
 name = "mcp-server"
-version = "0.0.1"
+version = "0.0.3"
 description = "Demo MCP Server"
 authors = [{ name = "John Doe" }]
 dependencies = [
     "mcp>=1.6.0",
-    "uipath-mcp>=0.0.1",
+    "uipath-mcp==0.0.3",
 ]
 requires-python = ">=3.10"

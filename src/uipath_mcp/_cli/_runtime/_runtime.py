@@ -63,7 +63,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 root_span.set_attribute("session_id", self.server.session_id)
                 root_span.set_attribute("command", self.server.command)
                 root_span.set_attribute("args", self.server.args)
-                root_span.set_attribute("type", self.server.type)
                 self.signalr_client = SignalRClient(
                     signalr_url,
                     headers={
