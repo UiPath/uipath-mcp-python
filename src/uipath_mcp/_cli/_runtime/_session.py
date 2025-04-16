@@ -79,7 +79,7 @@ class SessionServer:
                             f"Session {self.session_id} - sending to SignalR: {json_str[:100]}..."
                         )
                         await signalr_client.send(
-                            "OnMessageReceived", [self.session_id, json_str]
+                            "OnMessageReceived", [json_str]
                         )
                 finally:
                     # Cancel the consumer when we exit the loop
