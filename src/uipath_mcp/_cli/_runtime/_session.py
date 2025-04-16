@@ -163,7 +163,7 @@ class SessionServer:
         await self._message_queue.put(message)
         logger.debug(f"Session {self.session_id} - message queued for processing")
 
-    @traced
+    @traced()
     async def get_incoming_messages(self) -> None:
         """Get new messages from UiPath MCP Server."""
         response = self._uipath.api_client.request(
@@ -178,7 +178,7 @@ class SessionServer:
                 logger.info(f"Forwarding message to local MCP Server: {message}")
                 await self.send_message(json_message)
 
-    @traced
+    @traced()
     async def send_outgoing_message(self, message: types.JSONRPCMessage) -> None:
         """Send new message to UiPath MCP Server."""
         response = self._uipath.api_client.request(
