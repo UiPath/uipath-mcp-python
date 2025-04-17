@@ -38,6 +38,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self.server: Optional[McpServer] = None
         self.signalr_client: Optional[SignalRClient] = None
         self.session_servers: Dict[str, SessionServer] = {}
+        self._uipath = UiPath()
 
     async def execute(self) -> Optional[UiPathRuntimeResult]:
         """
@@ -216,6 +217,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 self.session_servers[self.server.session_id] = session_server
                 await session_server.get_incoming_messages()
             except Exception as e:
+                self.dispose_session()
                 logger.error(f"Error starting session server: {str(e)}")
 
     async def handle_signalr_close(self) -> None:
@@ -273,6 +275,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
+            self.dispose_session()
             error_message = "The server process failed to initialize. Verify environment variables are set correctly."
             if server_stderr_output:
                 error_message += f"\nServer error output:\n{server_stderr_output}"
@@ -306,8 +309,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 client_info["tools"].append(tool_info)
 
             # Register with UiPath MCP Server
-            uipath = UiPath()
-            uipath.api_client.request(
+            self._uipath.api_client.request(
                 "POST",
                 f"mcp_/api/servers-with-tools/{self.server.name}",
                 json=client_info,
@@ -321,6 +323,26 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 str(e),
                 UiPathErrorCategory.SYSTEM,
             ) from e
+
+    async def dispose_session(self) -> None:
+        """Dispose of the session on the server."""
+        try:
+            response = self._uipath.api_client.request(
+                "POST",
+                f"mcp_/mcp/{self.server.name}/dispose?sessionId={self.server.session_id}"
+            )
+            if response.status_code == 202:
+                logger.info(
+                    f"Sent session dispose signalr to UiPath MCP Server: {self.server.session_id}"
+                )
+            else:
+                logger.error(
+                    f"Error sending session dispose signalr to UiPath MCP Server: {response.status_code} - {response.text}"
+                )
+        except Exception as e:
+            logger.error(
+                f"Error sending session dispose signalr to UiPath MCP Server: {e}"
+            )
 
     async def cleanup(self) -> None:
         """Clean up all resources."""
