@@ -38,6 +38,7 @@ class McpTracer:
         if isinstance(root_value, types.JSONRPCRequest):
             span = self.tracer.start_span(f"{root_value.method} [{root_value.id}]")
             span.set_attribute("type", "request")
+            span.set_attribute("span_type", "request")
             span.set_attribute("id", str(root_value.id))
             span.set_attribute("method", root_value.method)
             self._add_request_attributes(span, root_value)
@@ -45,23 +46,27 @@ class McpTracer:
         elif isinstance(root_value, types.JSONRPCNotification):
             span = self.tracer.start_span(root_value.method)
             span.set_attribute("type", "notification")
+            span.set_attribute("span_type", "notification")
             span.set_attribute("method", root_value.method)
             self._add_notification_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCResponse):
             span = self.tracer.start_span(f"response [{root_value.id}]")
             span.set_attribute("type", "response")
+            span.set_attribute("span_type", "response")
             span.set_attribute("id", str(root_value.id))
             self._add_response_attributes(span, root_value)
 
         elif isinstance(root_value, types.JSONRPCError):
             span = self.tracer.start_span(f"error [{root_value.id}]")
             span.set_attribute("type", "error")
+            span.set_attribute("span_type", "error")
             span.set_attribute("id", str(root_value.id))
             span.set_attribute("error_code", root_value.error.code)
             span.set_attribute("error_message", root_value.error.message)
         else:
             span = self.tracer.start_span("unknown")
+            span.set_attribute("span_type",  str(type(root_value).__name__))
             span.set_attribute("type", str(type(root_value).__name__))
 
         # Add context attributes
