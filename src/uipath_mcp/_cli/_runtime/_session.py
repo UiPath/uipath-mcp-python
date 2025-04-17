@@ -102,9 +102,6 @@ class SessionServer:
             finally:
                 stderr_temp.seek(0)
                 self._server_stderr_output = stderr_temp.read()
-                logger.info(
-                    f"Session {self.session_id} - Server stderr output:\n{self._server_stderr_output}"
-                )
                 # The context managers will handle cleanup of resources
                 logger.info(f"Server process for session {self.session_id} has ended")
                 self.read_stream = None
