@@ -330,10 +330,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             response = self._uipath.api_client.request(
                 "POST",
                 f"mcp_/mcp/{self.server.name}/out/message?sessionId={self.server.session_id}",
-                json=types.JSONRPCNotification(
+                json=types.JSONRPCResponse(
                     jsonrpc="2.0",
-                    method="notifications/cancelled",
-                    params={"requestId": "*"},
+                    id=0,
+                    result={
+                        "protocolVersion": "invalid-version",
+                        "capabilities": {},
+                        "serverInfo": {"name": "server", "version": "1.0"}
+                    }
                 ).model_dump(),
             )
             if response.status_code == 202:
