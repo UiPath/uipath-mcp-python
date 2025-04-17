@@ -217,7 +217,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 self.session_servers[self.server.session_id] = session_server
                 await session_server.get_incoming_messages()
             except Exception as e:
-                self.dispose_session()
+                await self.dispose_session()
                 logger.error(f"Error starting session server: {str(e)}")
 
     async def handle_signalr_close(self) -> None:
@@ -275,7 +275,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
-            self.dispose_session()
+            await self.dispose_session()
             error_message = "The server process failed to initialize. Verify environment variables are set correctly."
             if server_stderr_output:
                 error_message += f"\nServer error output:\n{server_stderr_output}"
