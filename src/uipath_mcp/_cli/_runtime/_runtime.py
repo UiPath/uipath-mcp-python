@@ -106,6 +106,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     try:
                         await session_server.cleanup()
                         stderr_output = session_server.get_server_stderr()
+                        logger.info(f"stderr_output: {stderr_output}")
                         if stderr_output:
                             session_outputs[session_id] = stderr_output
                     except Exception as e:
@@ -120,7 +121,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     # If there are multiple sessions, use the sessionId as the key
                     output_result = session_outputs
 
+                logger.info(f"Output: {output_result}")
                 self.result = UiPathRuntimeResult(output=output_result)
+                logger.info(f"Result: {self.result.model_dump_json()}")
                 return self.result
 
         except Exception as e:
@@ -138,7 +141,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         finally:
             wait_for_tracers()
-            await self.cleanup()
 
     async def validate(self) -> None:
         """Validate runtime inputs and load MCP server configuration."""
