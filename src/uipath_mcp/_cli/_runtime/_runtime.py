@@ -101,7 +101,26 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 for task in pending:
                     task.cancel()
 
-                return UiPathRuntimeResult()
+                session_outputs = {}
+                for session_id, session_server in self.session_servers.items():
+                    try:
+                        await session_server.cleanup()
+                        stderr_output = session_server.get_server_stderr()
+                        if stderr_output:
+                            session_outputs[session_id] = stderr_output
+                    except Exception as e:
+                        logger.error(f"Error stopping session {session_id}: {str(e)}")
+
+                output_result = {}
+                if len(session_outputs) == 1:
+                    # If there's only one session, use a single "output" key
+                    first_session_id = next(iter(session_outputs))
+                    output_result["output"] = session_outputs[first_session_id]
+                elif session_outputs:
+                    # If there are multiple sessions, use the sessionId as the key
+                    output_result = session_outputs
+
+                return UiPathRuntimeResult(output=output_result)
 
         except Exception as e:
             if isinstance(e, UiPathMcpRuntimeError):
@@ -248,49 +267,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         # We don't continue with registration here - we'll do it after the context managers
 
         except BaseException as e:
-            is_process_lookup = False
-            is_exception_group_with_lookup = False
+            logger.error(f"Error during server initialization: {e}")
 
-            if isinstance(e, ProcessLookupError):
-                is_process_lookup = True
-            else:
-                try:
-                    from exceptiongroup import ExceptionGroup  # Backport for < 3.11
-
-                    if sys.version_info >= (3, 11) and isinstance(e, ExceptionGroup):
-                        for sub_e in e.exceptions:
-                            if isinstance(sub_e, ProcessLookupError):
-                                is_exception_group_with_lookup = True
-                                break
-                except ImportError:
-                    # ExceptionGroup is not available (Python < 3.11)
-                    pass
-
-            if is_process_lookup or is_exception_group_with_lookup:
-                logger.info(
-                    "Process already terminated during cleanup - this is expected"
-                )
-            else:
-                logger.error(f"Error during server initialization: {e}")
-                raise UiPathMcpRuntimeError(
-                    "SERVER_ERROR",
-                    "Server initialization failed",
-                    str(e),
-                    UiPathErrorCategory.DEPLOYMENT,
-                ) from e
-
-            if is_process_lookup or is_exception_group_with_lookup:
-                logger.info(
-                    "Process already terminated during cleanup - this is expected"
-                )
-            else:
-                logger.error(f"Error during server initialization: {e}")
-                raise UiPathMcpRuntimeError(
-                    "INITIALIZATION_ERROR",
-                    "Server initialization failed",
-                    str(e),
-                    UiPathErrorCategory.DEPLOYMENT,
-                ) from e
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
@@ -346,13 +324,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def cleanup(self) -> None:
         """Clean up all resources."""
         logger.info("Cleaning up all resources")
-
-        # Clean up all session servers
-        for session_id, session_server in list(self.session_servers.items()):
-            try:
-                await session_server.cleanup()
-            except Exception as e:
-                logger.error(f"Error cleaning up session {session_id}: {str(e)}")
 
         self.session_servers.clear()
 
