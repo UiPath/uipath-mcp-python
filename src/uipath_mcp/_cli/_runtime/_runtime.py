@@ -120,7 +120,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     # If there are multiple sessions, use the sessionId as the key
                     output_result = session_outputs
 
-                return UiPathRuntimeResult(output=output_result)
+                self.result = UiPathRuntimeResult(output=output_result)
+                return self.result
 
         except Exception as e:
             if isinstance(e, UiPathMcpRuntimeError):

@@ -53,6 +53,8 @@ class McpTracer:
                 span.set_attribute("type", "response")
                 span.set_attribute("span_type", "response")
                 span.set_attribute("id", str(root_value.id))
+                if isinstance(root_value.result, dict):
+                    parent_span.set_attribute("output", json.dumps(root_value.result))
                 self._add_response_attributes(span, root_value)
             else:  # JSONRPCError
                 span = self.tracer.start_span("error", context=span_context)
@@ -126,6 +128,9 @@ class McpTracer:
                 if "arguments" in request.params and isinstance(
                     request.params["arguments"], dict
                 ):
+                    span.set_attribute(
+                        "input", json.dumps(request.params["arguments"])
+                    )
                     span.set_attribute(
                         "tool_args", json.dumps(request.params["arguments"])
                     )
