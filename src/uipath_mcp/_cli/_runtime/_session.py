@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import tempfile
+from typing import Optional
 
 import mcp.types as types
 from mcp import StdioServerParameters
@@ -8,7 +10,6 @@ from opentelemetry import trace
 from uipath import UiPath
 
 from .._utils._config import McpServer
-from ._logger import NullLogger
 from ._tracer import McpTracer
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,11 @@ class SessionServer:
         self._message_queue = asyncio.Queue()
         self._uipath = UiPath()
         self._mcp_tracer = McpTracer(tracer, logger)
+        self._server_stderr_output: Optional[str] = None
+
+    def get_server_stderr(self) -> Optional[str]:
+        """Returns the captured stderr output from the MCP server process."""
+        return self._server_stderr_output
 
     async def start(self) -> None:
         """Start the server process in a separate task."""
@@ -59,44 +65,51 @@ class SessionServer:
     async def _run_server(self, server_params: StdioServerParameters) -> None:
         """Run the server in proper context managers."""
         logger.info(f"Starting server process for session {self.session_id}")
-        try:
-            stderr_null = NullLogger()
+        self._server_stderr_output = None
+        with tempfile.TemporaryFile(mode="w+") as stderr_temp:
+            try:
+                async with stdio_client(server_params, errlog=stderr_temp) as (
+                    read,
+                    write,
+                ):
+                    self.read_stream, self.write_stream = read, write
+                    logger.info(f"Session {self.session_id} - stdio client started")
 
-            async with stdio_client(server_params, errlog=stderr_null) as (
-                read,
-                write,
-            ):
-                self.read_stream, self.write_stream = read, write
-                logger.info(f"Session {self.session_id} - stdio client started")
+                    # Start the message consumer task
+                    consumer_task = asyncio.create_task(self._consume_messages())
 
-                # Start the message consumer task
-                consumer_task = asyncio.create_task(self._consume_messages())
-
-                # Process incoming messages from the server
-                try:
-                    while True:
-                        logger.info("Waiting for messages...")
-                        message = await self.read_stream.receive()
-                        await self.send_outgoing_message(message)
-                finally:
-                    # Cancel the consumer when we exit the loop
-                    consumer_task.cancel()
+                    # Process incoming messages from the server
                     try:
-                        await consumer_task
-                    except asyncio.CancelledError:
-                        pass
+                        while True:
+                            logger.info(
+                                f"Session {self.session_id}: Waiting for messages..."
+                            )
+                            message = await self.read_stream.receive()
+                            await self.send_outgoing_message(message)
+                    finally:
+                        stderr_temp.seek(0)
+                        self._server_stderr_output = stderr_temp.read()
+                        logger.debug(
+                            f"Session {self.session_id} - Server stderr output:\n{self._server_stderr_output}"
+                        )
+                        # Cancel the consumer when we exit the loop
+                        consumer_task.cancel()
+                        try:
+                            await consumer_task
+                        except asyncio.CancelledError:
+                            pass
 
-        except Exception as e:
-            logger.error(
-                f"Error in server process for session {self.session_id}: {e}",
-                exc_info=True,
-            )
-        finally:
-            # The context managers will handle cleanup of resources
-            logger.info(f"Server process for session {self.session_id} has ended")
-            self.read_stream = None
-            self.write_stream = None
-            self.mcp_session = None
+            except Exception as e:
+                logger.error(
+                    f"Error in server process for session {self.session_id}: {e}",
+                    exc_info=True,
+                )
+            finally:
+                # The context managers will handle cleanup of resources
+                logger.info(f"Server process for session {self.session_id} has ended")
+                self.read_stream = None
+                self.write_stream = None
+                self.mcp_session = None
 
     def _on_task_done(self, task):
         """Handle task completion."""
