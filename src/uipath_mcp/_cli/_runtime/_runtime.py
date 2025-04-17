@@ -239,8 +239,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
                     # We don't continue with registration here - we'll do it after the context managers
 
-        except Exception as e:
+        except BaseException as e:
             # Just log the exception during cleanup - it's expected
+            # except (ProcessLookupError, ExceptionGroup) works with 3.11+
             if "ProcessLookupError" in str(e) or "ExceptionGroup" in str(e):
                 logger.info("Process already terminated during cleanup - this is expected")
             else:
@@ -257,7 +258,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             raise UiPathMcpRuntimeError(
                 "TIMEOUT_ERROR",
                 "Server initialization timed out",
-                "The server process did not respond in time. Verify environment variables are set correctly.",
+                "The server process failed to initialize. Verify environment variables are set correctly.",
                 UiPathErrorCategory.DEPLOYMENT,
             )
 
