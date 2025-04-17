@@ -76,10 +76,8 @@ class SessionServer:
                 # Process incoming messages from the server
                 try:
                     while True:
-                        print("Waiting for messages...")
+                        logger.info("Waiting for messages...")
                         message = await self.read_stream.receive()
-                        json_str = message.model_dump_json()
-                        print(f"Received message from local server: {json_str}")
                         await self.send_outgoing_message(message)
                 finally:
                     # Cancel the consumer when we exit the loop
