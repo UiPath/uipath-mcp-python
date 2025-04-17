@@ -53,14 +53,9 @@ class McpTracer:
                 span.set_attribute("type", "response")
                 span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
-                if isinstance(root_value.result, dict):
-                    parent_span.set_attribute("output", json.dumps(root_value.result))
+                #if isinstance(root_value.result, dict):
+                    #parent_span.set_attribute("output", json.dumps(root_value.result))
                 self._add_response_attributes(span, root_value)
-                parent_span.add_event(
-                    "response",
-                    {"output": json.dumps(root_value.result)}
-                )
-                parent_span.end()
             else:  # JSONRPCError
                 span = self.tracer.start_span("error", context=span_context)
                 span.set_attribute("type", "error")
