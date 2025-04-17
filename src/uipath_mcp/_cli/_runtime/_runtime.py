@@ -207,6 +207,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """Register the MCP server type with UiPath."""
         logger.info(f"Registering MCP server type: {self.server.name}")
 
+        initialization_successful = False
+        tools_result = None
+
         try:
             # Create a temporary session to get tools
             server_params = StdioServerParameters(
@@ -219,50 +222,79 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("Initializing client session...")
-                    await asyncio.wait_for(
-                        session.initialize(),
-                        timeout=30
-                    )
-                    tools_result = await session.list_tools()
-                    logger.info(tools_result)
-                    client_info = {
-                        "server": {
-                            "Name": self.server.name,
-                            "Slug": self.server.name,
-                            "Version": "1.0.0",
-                            "Type": 1,
-                        },
-                        "tools": [],
-                    }
 
-                    for tool in tools_result.tools:
-                        tool_info = {
-                            "Type": 1,
-                            "Name": tool.name,
-                            "ProcessType": "Tool",
-                            "Description": tool.description,
-                        }
-                        client_info["tools"].append(tool_info)
+                    # Try to initialize with timeout
+                    try:
+                        await asyncio.wait_for(
+                            session.initialize(),
+                            timeout=30
+                        )
+                        initialization_successful = True
+                        logger.info("Initialization successful")
 
-                    # Register with UiPath MCP Server
-                    uipath = UiPath()
-                    uipath.api_client.request(
-                        "POST",
-                        f"mcp_/api/servers-with-tools/{self.server.name}",
-                        json=client_info,
-                    )
-                    logger.info("Registered MCP Server type successfully")
-        except asyncio.TimeoutError as e:
+                        # Only proceed if initialization was successful
+                        tools_result = await session.list_tools()
+                        logger.info(tools_result)
+                    except asyncio.TimeoutError:
+                        logger.error("Initialization timed out")
+                        # We'll handle this after exiting the context managers
+
+                    # We don't continue with registration here - we'll do it after the context managers
+
+        except Exception as e:
+            # Handle any other exceptions that occur
+            logger.error(f"Error during server initialization: {e}")
             raise UiPathMcpRuntimeError(
-                "TIMEOUT_ERROR",
+                "SERVER_ERROR",
                 "Server initialization failed",
                 str(e),
                 UiPathErrorCategory.DEPLOYMENT,
             ) from e
-        except Exception as e:
+
+        # Now that we're outside the context managers, check if initialization succeeded
+        if not initialization_successful:
             raise UiPathMcpRuntimeError(
-                "NETWORK_ERROR",
-                "Failed to register with UiPath MCP Server",
+                "TIMEOUT_ERROR",
+                "Server initialization timed out",
+                "The server process did not respond in time. Verify environment variables are set correctly.",
+                UiPathErrorCategory.DEPLOYMENT,
+            )
+
+        # If we got here, initialization was successful and we have the tools
+        # Now continue with registration
+        try:
+            client_info = {
+                "server": {
+                    "Name": self.server.name,
+                    "Slug": self.server.name,
+                    "Version": "1.0.0",
+                    "Type": 1,
+                },
+                "tools": [],
+            }
+
+            for tool in tools_result.tools:
+                tool_info = {
+                    "Type": 1,
+                    "Name": tool.name,
+                    "ProcessType": "Tool",
+                    "Description": tool.description,
+                }
+                client_info["tools"].append(tool_info)
+
+            # Register with UiPath MCP Server
+            uipath = UiPath()
+            uipath.api_client.request(
+                "POST",
+                f"mcp_/api/servers-with-tools/{self.server.name}",
+                json=client_info,
+            )
+            logger.info("Registered MCP Server type successfully")
+        except Exception as e:
+            logger.error(f"Error during registration: {e}")
+            raise UiPathMcpRuntimeError(
+                "REGISTRATION_ERROR",
+                "Failed to register MCP Server",
                 str(e),
                 UiPathErrorCategory.SYSTEM,
             ) from e
