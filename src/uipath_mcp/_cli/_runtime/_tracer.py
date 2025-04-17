@@ -51,15 +51,20 @@ class McpTracer:
             if isinstance(root_value, types.JSONRPCResponse):
                 span = self.tracer.start_span("response", context=span_context)
                 span.set_attribute("type", "response")
-                span.set_attribute("span_type", "response")
+                span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
                 if isinstance(root_value.result, dict):
                     parent_span.set_attribute("output", json.dumps(root_value.result))
                 self._add_response_attributes(span, root_value)
+                parent_span.add_event(
+                    "response",
+                    {"output": json.dumps(root_value.result)}
+                )
+                parent_span.end()
             else:  # JSONRPCError
                 span = self.tracer.start_span("error", context=span_context)
                 span.set_attribute("type", "error")
-                span.set_attribute("span_type", "error")
+                span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("error_code", root_value.error.code)
                 span.set_attribute("error_message", root_value.error.message)
@@ -71,7 +76,7 @@ class McpTracer:
             if isinstance(root_value, types.JSONRPCRequest):
                 span = self.tracer.start_span(f"{root_value.method}")
                 span.set_attribute("type", "request")
-                span.set_attribute("span_type", "request")
+                span.set_attribute("span_type", "MCP request")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("method", root_value.method)
                 self._add_request_attributes(span, root_value)
@@ -82,21 +87,21 @@ class McpTracer:
             elif isinstance(root_value, types.JSONRPCNotification):
                 span = self.tracer.start_span(root_value.method)
                 span.set_attribute("type", "notification")
-                span.set_attribute("span_type", "notification")
+                span.set_attribute("span_type", "MCP notification")
                 span.set_attribute("method", root_value.method)
                 self._add_notification_attributes(span, root_value)
 
             elif isinstance(root_value, types.JSONRPCResponse):
                 span = self.tracer.start_span("response")
                 span.set_attribute("type", "response")
-                span.set_attribute("span_type", "response")
+                span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
                 self._add_response_attributes(span, root_value)
 
             elif isinstance(root_value, types.JSONRPCError):
                 span = self.tracer.start_span("error")
                 span.set_attribute("type", "error")
-                span.set_attribute("span_type", "error")
+                span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("error_code", root_value.error.code)
                 span.set_attribute("error_message", root_value.error.message)
@@ -118,21 +123,18 @@ class McpTracer:
         if request.params:
             # Add basic param information
             if isinstance(request.params, dict):
-                span.set_attribute("params", json.dumps(request.params))
+                span.set_attribute("input", json.dumps(request.params))
 
             # Handle specific request types based on method
             if request.method == "tools/call" and isinstance(request.params, dict):
                 if "name" in request.params:
-                    span.set_attribute("tool_name", request.params["name"])
+                    span.set_attribute("name", request.params["name"])
                     span.update_name(f"{request.method}/{request.params['name']}")
                 if "arguments" in request.params and isinstance(
                     request.params["arguments"], dict
                 ):
                     span.set_attribute(
                         "input", json.dumps(request.params["arguments"])
-                    )
-                    span.set_attribute(
-                        "tool_args", json.dumps(request.params["arguments"])
                     )
 
             # Handle specific tracing for other method types
