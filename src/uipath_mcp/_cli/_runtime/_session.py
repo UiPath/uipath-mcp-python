@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 
 import mcp.types as types
 from mcp import StdioServerParameters
@@ -182,17 +181,11 @@ class SessionServer:
             message, session_id=self.session_id, server_name=self.server_config.name
         ) as span:
             try:
-                start_time = time.time()
                 response = self._uipath.api_client.request(
                     "POST",
                     f"mcp_/mcp/{self.server_config.name}/out/message?sessionId={self.session_id}",
                     json=message.model_dump(),
                 )
-
-                duration_ms = (time.time() - start_time) * 1000
-                span.set_attribute("http_duration_ms", duration_ms)
-                span.set_attribute("http_status_code", response.status_code)
-
                 if response.status_code == 202:
                     logger.info(
                         f"Outgoing message sent to UiPath MCP Server: {message}"
