@@ -62,6 +62,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             with tracer.start_as_current_span(self.server.name) as root_span:
                 root_span.set_attribute("session_id", self.server.session_id)
                 root_span.set_attribute("command", self.server.command)
+                root_span.set_attribute("env", self.server.env)
                 root_span.set_attribute("args", self.server.args)
                 self.signalr_client = SignalRClient(
                     signalr_url,

@@ -42,7 +42,7 @@ class SessionServer:
             server_params = StdioServerParameters(
                 command=self.server_config.command,
                 args=self.server_config.args,
-                env=None,
+                env=self.server_config.env,
             )
 
             # Start the server process in a separate task
