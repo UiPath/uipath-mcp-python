@@ -62,7 +62,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             with tracer.start_as_current_span(self.server.name) as root_span:
                 root_span.set_attribute("session_id", self.server.session_id)
                 root_span.set_attribute("command", self.server.command)
-                root_span.set_attribute("env", self.server.env)
                 root_span.set_attribute("args", self.server.args)
                 self.signalr_client = SignalRClient(
                     signalr_url,
@@ -222,7 +221,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("Initializing client session...")
-
                     # Try to initialize with timeout
                     try:
                         await asyncio.wait_for(
@@ -242,14 +240,17 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     # We don't continue with registration here - we'll do it after the context managers
 
         except Exception as e:
-            # Handle any other exceptions that occur
-            logger.error(f"Error during server initialization: {e}")
-            raise UiPathMcpRuntimeError(
-                "SERVER_ERROR",
-                "Server initialization failed",
-                str(e),
-                UiPathErrorCategory.DEPLOYMENT,
-            ) from e
+            # Just log the exception during cleanup - it's expected
+            if "ProcessLookupError" in str(e) or "ExceptionGroup" in str(e):
+                logger.info("Process already terminated during cleanup - this is expected")
+            else:
+                logger.error(f"Error during server initialization: {e}")
+                raise UiPathMcpRuntimeError(
+                    "SERVER_ERROR",
+                    "Server initialization failed",
+                    str(e),
+                    UiPathErrorCategory.DEPLOYMENT,
+                ) from e
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
