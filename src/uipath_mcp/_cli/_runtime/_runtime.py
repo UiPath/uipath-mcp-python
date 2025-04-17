@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import tempfile
 from typing import Any, Dict, Optional
 
 from mcp import ClientSession, StdioServerParameters
@@ -63,6 +64,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 root_span.set_attribute("session_id", self.server.session_id)
                 root_span.set_attribute("command", self.server.command)
                 root_span.set_attribute("args", self.server.args)
+                root_span.set_attribute("span_type", "server")
                 self.signalr_client = SignalRClient(
                     signalr_url,
                     headers={
@@ -208,6 +210,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         initialization_successful = False
         tools_result = None
+        server_stderr_output = ""
 
         try:
             # Create a temporary session to get tools
@@ -218,32 +221,55 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             )
 
             # Start a temporary stdio client to get tools
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    logger.info("Initializing client session...")
-                    # Try to initialize with timeout
-                    try:
-                        await asyncio.wait_for(
-                            session.initialize(),
-                            timeout=30
-                        )
-                        initialization_successful = True
-                        logger.info("Initialization successful")
+            # Use a temporary file to capture stderr
+            with tempfile.TemporaryFile(mode="w+") as stderr_temp:
+                async with stdio_client(server_params, errlog=stderr_temp) as (
+                    read,
+                    write,
+                ):
+                    async with ClientSession(read, write) as session:
+                        logger.info("Initializing client session...")
+                        # Try to initialize with timeout
+                        try:
+                            await asyncio.wait_for(session.initialize(), timeout=30)
+                            initialization_successful = True
+                            logger.info("Initialization successful")
 
-                        # Only proceed if initialization was successful
-                        tools_result = await session.list_tools()
-                        logger.info(tools_result)
-                    except asyncio.TimeoutError:
-                        logger.error("Initialization timed out")
-                        # We'll handle this after exiting the context managers
+                            # Only proceed if initialization was successful
+                            tools_result = await session.list_tools()
+                            logger.info(tools_result)
+                        except asyncio.TimeoutError:
+                            logger.error("Initialization timed out")
+                            # Capture stderr output here, after the timeout
+                            stderr_temp.seek(0)
+                            server_stderr_output = stderr_temp.read()
+                            # We'll handle this after exiting the context managers
 
-                    # We don't continue with registration here - we'll do it after the context managers
+                        # We don't continue with registration here - we'll do it after the context managers
 
         except BaseException as e:
-            # Just log the exception during cleanup - it's expected
-            # except (ProcessLookupError, ExceptionGroup) works with 3.11+
-            if "ProcessLookupError" in str(e) or "ExceptionGroup" in str(e):
-                logger.info("Process already terminated during cleanup - this is expected")
+            is_process_lookup = False
+            is_exception_group_with_lookup = False
+
+            if isinstance(e, ProcessLookupError):
+                is_process_lookup = True
+            else:
+                try:
+                    from exceptiongroup import ExceptionGroup  # Backport for < 3.11
+
+                    if sys.version_info >= (3, 11) and isinstance(e, ExceptionGroup):
+                        for sub_e in e.exceptions:
+                            if isinstance(sub_e, ProcessLookupError):
+                                is_exception_group_with_lookup = True
+                                break
+                except ImportError:
+                    # ExceptionGroup is not available (Python < 3.11)
+                    pass
+
+            if is_process_lookup or is_exception_group_with_lookup:
+                logger.info(
+                    "Process already terminated during cleanup - this is expected"
+                )
             else:
                 logger.error(f"Error during server initialization: {e}")
                 raise UiPathMcpRuntimeError(
@@ -253,12 +279,28 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     UiPathErrorCategory.DEPLOYMENT,
                 ) from e
 
+            if is_process_lookup or is_exception_group_with_lookup:
+                logger.info(
+                    "Process already terminated during cleanup - this is expected"
+                )
+            else:
+                logger.error(f"Error during server initialization: {e}")
+                raise UiPathMcpRuntimeError(
+                    "INITIALIZATION_ERROR",
+                    "Server initialization failed",
+                    str(e),
+                    UiPathErrorCategory.DEPLOYMENT,
+                ) from e
+
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
+            error_message = "The server process failed to initialize. Verify environment variables are set correctly."
+            if server_stderr_output:
+                error_message += f"\nServer error output:\n{server_stderr_output}"
             raise UiPathMcpRuntimeError(
-                "TIMEOUT_ERROR",
-                "Server initialization timed out",
-                "The server process failed to initialize. Verify environment variables are set correctly.",
+                "INITIALIZATION_ERROR",
+                "Server initialization failed",
+                error_message,
                 UiPathErrorCategory.DEPLOYMENT,
             )
 
