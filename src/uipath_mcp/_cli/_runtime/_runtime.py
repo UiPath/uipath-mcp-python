@@ -5,6 +5,7 @@ import sys
 import tempfile
 from typing import Any, Dict, Optional
 
+import mcp.types as types
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from opentelemetry import trace
@@ -272,7 +273,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         except BaseException as e:
             logger.error(f"Error during server initialization: {e}")
 
-
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
             await self.dispose_session()
@@ -329,7 +329,25 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = self._uipath.api_client.request(
                 "POST",
-                f"mcp_/mcp/{self.server.name}/dispose?sessionId={self.server.session_id}"
+                f"mcp_/mcp/{self.server.name}/out/message?sessionId={self.server.session_id}",
+                json=types.JSONRPCNotification(
+                    jsonrpc="2.0",
+                    method="notifications/cancelled",
+                    params={"requestId": "*"},
+                ).model_dump(),
+            )
+            if response.status_code == 202:
+                logger.info(
+                    f"Sent outgoing cancelled message to UiPath MCP Server: {self.server.session_id}"
+                )
+            else:
+                logger.error(
+                    f"Error sending outgoing cancelled message to to UiPath MCP Server: {response.status_code} - {response.text}"
+                )
+
+            response = self._uipath.api_client.request(
+                "POST",
+                f"mcp_/mcp/{self.server.name}/dispose?sessionId={self.server.session_id}",
             )
             if response.status_code == 202:
                 logger.info(
