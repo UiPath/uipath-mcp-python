@@ -87,11 +87,6 @@ class SessionServer:
                             message = await self.read_stream.receive()
                             await self.send_outgoing_message(message)
                     finally:
-                        stderr_temp.seek(0)
-                        self._server_stderr_output = stderr_temp.read()
-                        logger.debug(
-                            f"Session {self.session_id} - Server stderr output:\n{self._server_stderr_output}"
-                        )
                         # Cancel the consumer when we exit the loop
                         consumer_task.cancel()
                         try:
@@ -105,6 +100,11 @@ class SessionServer:
                     exc_info=True,
                 )
             finally:
+                stderr_temp.seek(0)
+                self._server_stderr_output = stderr_temp.read()
+                logger.info(
+                    f"Session {self.session_id} - Server stderr output:\n{self._server_stderr_output}"
+                )
                 # The context managers will handle cleanup of resources
                 logger.info(f"Server process for session {self.session_id} has ended")
                 self.read_stream = None
