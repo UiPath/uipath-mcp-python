@@ -13,6 +13,7 @@ class McpServer:
         self.session_id = session_id
         self.type = server_config.get("type")
         self.command = server_config.get("command")
+        self.env = server_config.get("env", {})
         self.args = server_config.get("args", [])
 
     @property
