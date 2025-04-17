@@ -212,15 +212,19 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             server_params = StdioServerParameters(
                 command=self.server.command,
                 args=self.server.args,
-                env=None,
+                env=self.server.env,
             )
 
             # Start a temporary stdio client to get tools
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
-                    await session.initialize()
+                    logger.info("Initializing client session...")
+                    await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=30
+                    )
                     tools_result = await session.list_tools()
-                    print(tools_result)
+                    logger.info(tools_result)
                     client_info = {
                         "server": {
                             "Name": self.server.name,
@@ -248,7 +252,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         json=client_info,
                     )
                     logger.info("Registered MCP Server type successfully")
-
+        except asyncio.TimeoutError as e:
+            raise UiPathMcpRuntimeError(
+                "TIMEOUT_ERROR",
+                "Server initialization failed",
+                str(e),
+                UiPathErrorCategory.DEPLOYMENT,
+            ) from e
         except Exception as e:
             raise UiPathMcpRuntimeError(
                 "NETWORK_ERROR",
