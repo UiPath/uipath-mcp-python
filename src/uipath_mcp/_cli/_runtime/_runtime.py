@@ -117,7 +117,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 if len(session_outputs) == 1:
                     # If there's only one session, use a single "output" key
                     first_session_id = next(iter(session_outputs))
-                    output_result["output"] = session_outputs[first_session_id]
+                    output_result["content"] = session_outputs[first_session_id]
                 elif session_outputs:
                     # If there are multiple sessions, use the sessionId as the key
                     output_result = session_outputs
