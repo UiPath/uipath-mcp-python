@@ -17,8 +17,8 @@ class McpTracer:
         tracer: Optional[trace.Tracer] = None,
         logger: Optional[logging.Logger] = None,
     ):
-        self.tracer = tracer or trace.get_tracer(__name__)
-        self.logger = logger or logging.getLogger(__name__)
+        self._tracer = tracer or trace.get_tracer(__name__)
+        self._logger = logger or logging.getLogger(__name__)
         # Dictionary to store active request spans
         self._active_request_spans: Dict[str, Span] = {}
 
@@ -49,7 +49,7 @@ class McpTracer:
             span_context = trace.set_span_in_context(parent_span)
 
             if isinstance(root_value, types.JSONRPCResponse):
-                span = self.tracer.start_span("response", context=span_context)
+                span = self._tracer.start_span("response", context=span_context)
                 span.set_attribute("type", "response")
                 span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
@@ -57,7 +57,7 @@ class McpTracer:
                     #parent_span.set_attribute("output", json.dumps(root_value.result))
                 self._add_response_attributes(span, root_value)
             else:  # JSONRPCError
-                span = self.tracer.start_span("error", context=span_context)
+                span = self._tracer.start_span("error", context=span_context)
                 span.set_attribute("type", "error")
                 span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
@@ -69,7 +69,7 @@ class McpTracer:
         else:
             # Create standard span based on message type
             if isinstance(root_value, types.JSONRPCRequest):
-                span = self.tracer.start_span(f"{root_value.method}")
+                span = self._tracer.start_span(f"{root_value.method}")
                 span.set_attribute("type", "request")
                 span.set_attribute("span_type", "MCP request")
                 span.set_attribute("id", str(root_value.id))
@@ -80,28 +80,28 @@ class McpTracer:
                 self._active_request_spans[str(root_value.id)] = span
 
             elif isinstance(root_value, types.JSONRPCNotification):
-                span = self.tracer.start_span(root_value.method)
+                span = self._tracer.start_span(root_value.method)
                 span.set_attribute("type", "notification")
                 span.set_attribute("span_type", "MCP notification")
                 span.set_attribute("method", root_value.method)
                 self._add_notification_attributes(span, root_value)
 
             elif isinstance(root_value, types.JSONRPCResponse):
-                span = self.tracer.start_span("response")
+                span = self._tracer.start_span("response")
                 span.set_attribute("type", "response")
                 span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
                 self._add_response_attributes(span, root_value)
 
             elif isinstance(root_value, types.JSONRPCError):
-                span = self.tracer.start_span("error")
+                span = self._tracer.start_span("error")
                 span.set_attribute("type", "error")
                 span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("error_code", root_value.error.code)
                 span.set_attribute("error_message", root_value.error.message)
             else:
-                span = self.tracer.start_span("unknown")
+                span = self._tracer.start_span("unknown")
                 span.set_attribute("span_type", str(type(root_value).__name__))
                 span.set_attribute("type", str(type(root_value).__name__))
 
@@ -201,7 +201,7 @@ class McpTracer:
         span.set_attribute(
             "error_message", text[:1000] if text else ""
         )  # Limit error message length
-        self.logger.error(f"HTTP error: {status_code} {text}")
+        self._logger.error(f"HTTP error: {status_code} {text}")
 
     def record_exception(self, span: Span, exception: Exception) -> None:
         """Record exception details in a span."""
@@ -212,11 +212,11 @@ class McpTracer:
             "error_message", str(exception)[:1000]
         )  # Limit error message length
         span.record_exception(exception)
-        self.logger.error(f"Exception: {exception}", exc_info=True)
+        self._logger.error(f"Exception: {exception}", exc_info=True)
 
     def create_operation_span(self, operation_name: str, **context) -> Span:
         """Create a span for a general operation (not directly tied to a message)."""
-        span = self.tracer.start_span(operation_name)
+        span = self._tracer.start_span(operation_name)
 
         for key, value in context.items():
             span.set_attribute(key, str(value))
