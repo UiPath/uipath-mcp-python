@@ -1,6 +1,6 @@
 [project]
 name = "uipath-mcp"
-version = "0.0.48"
+version = "0.0.49"
 description = "UiPath MCP SDK"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
