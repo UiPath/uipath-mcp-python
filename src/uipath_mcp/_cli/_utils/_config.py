@@ -13,8 +13,11 @@ class McpServer:
         self.session_id = session_id
         self.type = server_config.get("type")
         self.command = server_config.get("command")
-        self.env = server_config.get("env", {})
         self.args = server_config.get("args", [])
+        self.env = server_config.get("env", {})
+        for key in list(self.env.keys()):
+            if key in os.environ:
+                self.env[key] = os.environ[key]
 
     @property
     def file_path(self) -> Optional[str]:
