@@ -98,7 +98,7 @@ class SessionServer:
         """Run the local MCP server process."""
         logger.info(f"Starting local MCP Server process for session {self._session_id}")
         self._server_stderr_output = None
-        with tempfile.TemporaryFile(mode="w+") as stderr_temp:
+        with tempfile.TemporaryFile(mode='w+b') as stderr_temp:
             try:
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
@@ -129,7 +129,7 @@ class SessionServer:
                 )
             finally:
                 stderr_temp.seek(0)
-                self._server_stderr_output = stderr_temp.read()
+                self._server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
                 # The context managers will handle cleanup of resources
 
     def _run_server_callback(self, task):

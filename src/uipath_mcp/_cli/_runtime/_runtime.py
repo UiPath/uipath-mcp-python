@@ -38,7 +38,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._server: Optional[McpServer] = None
         self._signalr_client: Optional[SignalRClient] = None
         self._session_servers: Dict[str, SessionServer] = {}
-        self._session_outputs: Dict[str, str] = {}
+        self._session_output: Optional[str] = None
         self._cancel_event = asyncio.Event()
         self._uipath = UiPath()
 
@@ -59,10 +59,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 return None
 
             # Set up SignalR client
-            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}&sessionId={self._server.session_id}"
+            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}"
+            if self._server.session_id:
+                signalr_url += f"&sessionId={self._server.session_id}"
 
             with tracer.start_as_current_span(self._server.name) as root_span:
-                root_span.set_attribute("session_id", self._server.session_id)
+                if self._server.session_id:
+                    root_span.set_attribute("session_id", self._server.session_id)
                 root_span.set_attribute("command", self._server.command)
                 root_span.set_attribute("args", self._server.args)
                 root_span.set_attribute("span_type", "MCP Server")
@@ -100,13 +103,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     task.cancel()
 
                 output_result = {}
-                if len(self._session_outputs) == 1:
-                    # If there's only one session, use a single "content" key
-                    single_session_id = next(iter(self._session_outputs))
-                    output_result["content"] = self._session_outputs[single_session_id]
-                elif self._session_outputs:
-                    # If there are multiple sessions, use the session_id as the key
-                    output_result = self._session_outputs
+                if self._session_output:
+                    output_result["content"] = self._session_output
 
                 self.context.result = UiPathRuntimeResult(output=output_result)
 
@@ -138,6 +136,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def cleanup(self) -> None:
         """Clean up all resources."""
+        for session_id, session_server in self._session_servers.items():
+            try:
+                await session_server.stop()
+            except Exception as e:
+                logger.error(
+                    f"Error cleaning up session server {session_id}: {str(e)}"
+                )
         if self._signalr_client and hasattr(self._signalr_client, "_transport"):
             transport = self._signalr_client._transport
             if transport and hasattr(transport, "_ws") and transport._ws:
@@ -167,10 +172,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if session_server:
                 await session_server.stop()
                 if session_server.output:
-                    self._session_outputs[session_id] = session_server.output
-
+                    if self._is_ephemeral:
+                        self._session_output = session_server.output
+                    else:
+                        logger.info(
+                            f"Session {session_id} output: {session_server.output}"
+                        )
             # If this is an ephemeral runtime for a specific session, cancel the execution
-            if self._is_ephemeral():
+            if self._is_ephemeral:
                 self._cancel_event.set()
 
         except Exception as e:
@@ -215,7 +224,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """Handle SignalR connection open event."""
         logger.info("Websocket connection established.")
         # If this is an ephemeral runtime we need to start the local MCP session
-        if self._is_ephemeral():
+        if self._is_ephemeral:
             try:
                 # Check if we have a session server for this session_id
                 # Websocket reconnection may occur, so we need to check if the session server already exists
@@ -254,7 +263,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Start a temporary stdio client to get tools
             # Use a temporary file to capture stderr
-            with tempfile.TemporaryFile(mode="w+") as stderr_temp:
+            with tempfile.TemporaryFile(mode='w+b') as stderr_temp:
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
                     write,
@@ -274,7 +283,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             logger.error("Initialization timed out")
                             # Capture stderr output here, after the timeout
                             stderr_temp.seek(0)
-                            server_stderr_output = stderr_temp.read()
+                            server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
                             # We'll handle this after exiting the context managers
 
                         # We don't continue with registration here - we'll do it after the context managers
@@ -303,7 +312,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": self._server.name,
                     "Slug": self._server.name,
                     "Version": "1.0.0",
-                    "Type": 1,
+                    "Type": 1 if self._server.session_id else 3,
                 },
                 "tools": [],
             }
@@ -339,7 +348,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Ephemeral runtimes are triggered by new client connections.
         """
 
-        if self._is_ephemeral() is False:
+        if self._is_ephemeral is False:
             return
 
         try:
@@ -350,7 +359,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     jsonrpc="2.0",
                     id=0,
                     result={
-                        "protocolVersion": "initiliaze-failure",
+                        "protocolVersion": "initialize-failure",
                         "capabilities": {},
                         "serverInfo": {"name": self._server.name, "version": "1.0"},
                     },
@@ -369,6 +378,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 f"Error sending session dispose signal to UiPath MCP Server: {e}"
             )
 
+    @property
     def _is_ephemeral(self) -> bool:
         """
         Check if the runtime is ephemeral (created on-demand for a single agent execution).
