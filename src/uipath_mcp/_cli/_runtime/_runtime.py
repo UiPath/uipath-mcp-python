@@ -165,11 +165,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             session_server = self._session_servers.pop(session_id, None)
             if session_server:
-                await session_server.cleanup()
+                await session_server.stop()
                 if session_server.output:
                     self._session_outputs[session_id] = session_server.output
 
-            if len(self._session_servers) == 0:
+            # If this is an ephemeral runtime for a specific session, cancel the execution
+            if self._is_ephemeral():
                 self._cancel_event.set()
 
         except Exception as e:
@@ -212,13 +213,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def _handle_signalr_open(self) -> None:
         """Handle SignalR connection open event."""
-
         logger.info("Websocket connection established.")
-        if self._server.session_id:
+        # If this is an ephemeral runtime we need to start the local MCP session
+        if self._is_ephemeral():
             try:
                 session_server = SessionServer(self._server, self._server.session_id)
                 await session_server.start()
                 self._session_servers[self._server.session_id] = session_server
+                # Check for existing messages from the connected client
                 await session_server.on_message_received()
             except Exception as e:
                 await self._on_initialization_failure()
@@ -328,8 +330,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             ) from e
 
     async def _on_initialization_failure(self) -> None:
-        """Dispose of the session on the server."""
-        if self._server.session_id is None:
+        """
+        Sends a dummy initialization failure message to abort the already connected client.
+        Ephemeral runtimes are triggered by new client connections.
+        """
+
+        if self._is_ephemeral() is False:
             return
 
         try:
@@ -358,3 +364,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             logger.error(
                 f"Error sending session dispose signal to UiPath MCP Server: {e}"
             )
+
+    def _is_ephemeral(self) -> bool:
+        """
+        Check if the runtime is ephemeral (created on-demand for a single agent execution).
+
+        Returns:
+            bool: True if this is an ephemeral runtime (has a session_id), False otherwise.
+        """
+        return self._server.session_id is not None

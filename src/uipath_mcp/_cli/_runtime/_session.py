@@ -53,7 +53,7 @@ class SessionServer:
             logger.error(
                 f"Error starting session {self._session_id}: {e}", exc_info=True
             )
-            await self.cleanup()
+            await self.stop()
             raise
 
     async def on_message_received(self) -> None:
@@ -74,7 +74,7 @@ class SessionServer:
                 ) as _:
                     await self._message_queue.put(message)
 
-    async def cleanup(self) -> None:
+    async def stop(self) -> None:
         """Clean up resources and stop the server."""
         # Cancel the context task if it exists
         if self._run_task and not self._run_task.done():
