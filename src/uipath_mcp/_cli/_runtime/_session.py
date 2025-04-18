@@ -72,7 +72,7 @@ class SessionServer:
                     session_id=self._session_id,
                     server_name=self._server_config.name,
                 ) as _:
-                    await self._message_queue.put(message)
+                    await self._message_queue.put(json_message)
 
     async def stop(self) -> None:
         """Clean up resources and stop the server."""
