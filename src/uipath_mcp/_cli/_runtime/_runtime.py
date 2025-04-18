@@ -217,9 +217,15 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         # If this is an ephemeral runtime we need to start the local MCP session
         if self._is_ephemeral():
             try:
-                session_server = SessionServer(self._server, self._server.session_id)
-                await session_server.start()
-                self._session_servers[self._server.session_id] = session_server
+                # Check if we have a session server for this session_id
+                # Websocket reconnection may occur, so we need to check if the session server already exists
+                if self._server.session_id not in self._session_servers:
+                    # Create and start a new session server
+                    session_server = SessionServer(self._server, self._server.session_id)
+                    self._session_servers[self._server.session_id] = session_server
+                    await session_server.start()
+                # Get the session server for this session
+                session_server = self._session_servers[self._server.session_id]
                 # Check for existing messages from the connected client
                 await session_server.on_message_received()
             except Exception as e:
@@ -229,8 +235,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def _handle_signalr_close(self) -> None:
         """Handle SignalR connection close event."""
         logger.info("Websocket connection closed.")
-        # Clean up all session servers when the connection closes
-        await self.cleanup()
 
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
