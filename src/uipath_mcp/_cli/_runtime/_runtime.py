@@ -136,7 +136,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def cleanup(self) -> None:
         """Clean up all resources."""
 
-        self._on_runtime_abort()
+        await self._on_runtime_abort()
 
         for session_id, session_server in self._session_servers.items():
             try:
@@ -211,7 +211,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     logger.error(
                         f"Error starting session server for session {session_id}: {str(e)}"
                     )
-                    self._on_session_start_error(session_id)
+                    await self._on_session_start_error(session_id)
                     raise
                 self._session_servers[session_id] = session_server
 
