@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import tempfile
+import uuid
 from typing import Any, Dict, Optional
 
 import mcp.types as types
@@ -36,6 +37,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         super().__init__(context)
         self.context: UiPathMcpRuntimeContext = context
         self._server: Optional[McpServer] = None
+        self._runtime_id = self.context.job_id if self.context.job_id else str(uuid.uuid4())
         self._signalr_client: Optional[SignalRClient] = None
         self._session_servers: Dict[str, SessionServer] = {}
         self._session_output: Optional[str] = None
@@ -59,13 +61,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 return None
 
             # Set up SignalR client
-            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}"
-            if self._server.session_id:
-                signalr_url += f"&sessionId={self._server.session_id}"
+            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
 
             with tracer.start_as_current_span(self._server.name) as root_span:
-                if self._server.session_id:
-                    root_span.set_attribute("session_id", self._server.session_id)
+                root_span.set_attribute("runtime_id", self._runtime_id)
                 root_span.set_attribute("command", self._server.command)
                 root_span.set_attribute("args", self._server.args)
                 root_span.set_attribute("span_type", "MCP Server")
@@ -136,6 +135,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def cleanup(self) -> None:
         """Clean up all resources."""
+
+        self._on_runtime_abort()
+
         for session_id, session_server in self._session_servers.items():
             try:
                 await session_server.stop()
@@ -143,6 +145,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 logger.error(
                     f"Error cleaning up session server {session_id}: {str(e)}"
                 )
+
         if self._signalr_client and hasattr(self._signalr_client, "_transport"):
             transport = self._signalr_client._transport
             if transport and hasattr(transport, "_ws") and transport._ws:
@@ -172,14 +175,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if session_server:
                 await session_server.stop()
                 if session_server.output:
-                    if self._is_ephemeral:
+                    if self.sandboxed:
                         self._session_output = session_server.output
                     else:
                         logger.info(
                             f"Session {session_id} output: {session_server.output}"
                         )
-            # If this is an ephemeral runtime for a specific session, cancel the execution
-            if self._is_ephemeral:
+            # If this is a sandboxed runtime for a specific session, cancel the execution
+            if self.sandboxed:
                 self._cancel_event.set()
 
         except Exception as e:
@@ -202,8 +205,15 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if session_id not in self._session_servers:
                 # Create and start a new session server
                 session_server = SessionServer(self._server, session_id)
+                try:
+                    await session_server.start()
+                except Exception as e:
+                    logger.error(
+                        f"Error starting session server for session {session_id}: {str(e)}"
+                    )
+                    self._on_session_start_error(session_id)
+                    raise
                 self._session_servers[session_id] = session_server
-                await session_server.start()
 
             # Get the session server for this session
             session_server = self._session_servers[session_id]
@@ -223,23 +233,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def _handle_signalr_open(self) -> None:
         """Handle SignalR connection open event."""
         logger.info("Websocket connection established.")
-        # If this is an ephemeral runtime we need to start the local MCP session
-        if self._is_ephemeral:
-            try:
-                # Check if we have a session server for this session_id
-                # Websocket reconnection may occur, so we need to check if the session server already exists
-                if self._server.session_id not in self._session_servers:
-                    # Create and start a new session server
-                    session_server = SessionServer(self._server, self._server.session_id)
-                    self._session_servers[self._server.session_id] = session_server
-                    await session_server.start()
-                # Get the session server for this session
-                session_server = self._session_servers[self._server.session_id]
-                # Check for existing messages from the connected client
-                await session_server.on_message_received()
-            except Exception as e:
-                await self._on_initialization_failure()
-                logger.error(f"Error starting session server: {str(e)}")
 
     async def _handle_signalr_close(self) -> None:
         """Handle SignalR connection close event."""
@@ -293,7 +286,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
-            await self._on_initialization_failure()
+            await self._on_runtime_abort()
             error_message = "The server process failed to initialize. Verify environment variables are set correctly."
             if server_stderr_output:
                 error_message += f"\nServer error output:\n{server_stderr_output}"
@@ -312,7 +305,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": self._server.name,
                     "Slug": self._server.name,
                     "Version": "1.0.0",
-                    "Type": 1 if self._server.session_id else 3,
+                    "Type": 1 if self.sandboxed else 3,
                 },
                 "tools": [],
             }
@@ -342,19 +335,15 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.SYSTEM,
             ) from e
 
-    async def _on_initialization_failure(self) -> None:
+    async def _on_session_start_error(self, session_id: str) -> None:
         """
         Sends a dummy initialization failure message to abort the already connected client.
-        Ephemeral runtimes are triggered by new client connections.
+        Sanboxed runtimes are triggered by new client connections.
         """
-
-        if self._is_ephemeral is False:
-            return
-
         try:
             response = self._uipath.api_client.request(
                 "POST",
-                f"mcp_/mcp/{self._server.name}/out/message?sessionId={self._server.session_id}",
+                f"mcp_/mcp/{self._server.name}/out/message?sessionId={session_id}",
                 json=types.JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
@@ -367,7 +356,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             )
             if response.status_code == 202:
                 logger.info(
-                    f"Sent outgoing session dispose message to UiPath MCP Server: {self._server.session_id}"
+                    f"Sent outgoing session dispose message to UiPath MCP Server: {session_id}"
                 )
             else:
                 logger.error(
@@ -378,12 +367,34 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 f"Error sending session dispose signal to UiPath MCP Server: {e}"
             )
 
-    @property
-    def _is_ephemeral(self) -> bool:
+    async def _on_runtime_abort(self) -> None:
         """
-        Check if the runtime is ephemeral (created on-demand for a single agent execution).
+        Sends a runtime abort signalr to terminate all connected sessions.
+        """
+        try:
+            response = self._uipath.api_client.request(
+                "POST",
+                f"mcp_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}"
+            )
+            if response.status_code == 202:
+                logger.info(
+                    f"Sent runtime abort signal to UiPath MCP Server: {self._runtime_id}"
+                )
+            else:
+                logger.error(
+                    f"Error sending runtime abort signalr to UiPath MCP Server: {response.status_code} - {response.text}"
+                )
+        except Exception as e:
+            logger.error(
+                f"Error sending runtime abort signal to UiPath MCP Server: {e}"
+            )
+
+    @property
+    def sandboxed(self) -> bool:
+        """
+        Check if the runtime is sandboxed (created on-demand for a single agent execution).
 
         Returns:
-            bool: True if this is an ephemeral runtime (has a session_id), False otherwise.
+            bool: True if this is an sandboxed runtime (has a job_id), False otherwise.
         """
-        return self._server.session_id is not None
+        return self.context.job_id is not None
