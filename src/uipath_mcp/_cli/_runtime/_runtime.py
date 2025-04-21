@@ -8,7 +8,6 @@ from typing import Any, Dict, Optional
 
 import mcp.types as types
 from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 from opentelemetry import trace
 from pysignalr.client import SignalRClient
 from uipath import UiPath
@@ -23,6 +22,7 @@ from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
+from ._stdio_client import stdio_client
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
