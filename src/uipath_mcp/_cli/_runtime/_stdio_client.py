@@ -98,18 +98,32 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
         finally:
             # Clean up process to prevent any dangling orphaned processes
             try:
+                # Cancel the task group to stop readers/writers
+                tg.cancel_scope.cancel()
+                # Close the pipes explicitly to prevent ResourceWarnings
+                if hasattr(process, "stdin") and process.stdin:
+                    process.stdin.close()
+                if hasattr(process, "stdout") and process.stdout:
+                    process.stdout.close()
+                if hasattr(process, "stderr") and process.stderr:
+                    process.stderr.close()
+                # Then terminate the process with escalating signals
                 process.terminate()
-                with anyio.fail_after(2.0):
-                    await process.wait()
-            except TimeoutError:
                 try:
-                    if sys.platform == "win32":
-                        # On Windows, simulate Ctrl+C
-                        process.send_signal(signal.CTRL_C_EVENT)
-                    else:
-                        process.send_signal(signal.SIGINT)
                     with anyio.fail_after(2.0):
                         await process.wait()
                 except TimeoutError:
-                    # Force kill if it doesn't terminate
-                    process.kill()
+                    try:
+                        if sys.platform == "win32":
+                            process.send_signal(signal.CTRL_C_EVENT)
+                        else:
+                            process.send_signal(signal.SIGINT)
+                        with anyio.fail_after(2.0):
+                            await process.wait()
+                    except TimeoutError:
+                        # Force kill if it doesn't terminate
+                        process.kill()
+                # Give the event loop a chance to clean up
+                await anyio.sleep(0.1)
+            except Exception:
+                pass
