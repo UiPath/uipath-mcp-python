@@ -240,8 +240,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
-        logger.info(f"Registering MCP server: {self._server.name}")
-
         initialization_successful = False
         tools_result = None
         server_stderr_output = ""
@@ -322,7 +320,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Register with UiPath MCP Server
             self._uipath.api_client.request(
                 "POST",
-                f"mcp_/api/servers-with-tools/{self._server.name}",
+                f"mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
             )
             logger.info("Registered MCP Server type successfully")
