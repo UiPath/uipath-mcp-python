@@ -80,7 +80,7 @@ class SessionServer:
         if self._run_task and not self._run_task.done():
             self._run_task.cancel()
             try:
-                await asyncio.wait_for(asyncio.shield(self._run_task), timeout=2.0)
+                await asyncio.wait_for(asyncio.shield(self._run_task), timeout=3.0)
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
             except Exception as e:
