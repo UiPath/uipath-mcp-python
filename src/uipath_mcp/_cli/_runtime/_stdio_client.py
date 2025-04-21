@@ -101,7 +101,7 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
                 # Then terminate the process with escalating signals
                 process.terminate()
                 try:
-                    with anyio.fail_after(2.0):
+                    with anyio.fail_after(1.0):
                         await process.wait()
                 except TimeoutError:
                     try:
@@ -109,7 +109,7 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
                             process.send_signal(signal.CTRL_C_EVENT)
                         else:
                             process.send_signal(signal.SIGINT)
-                        with anyio.fail_after(2.0):
+                        with anyio.fail_after(1.0):
                             await process.wait()
                     except TimeoutError:
                         # Force kill if it doesn't terminate

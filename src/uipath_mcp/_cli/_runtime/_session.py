@@ -5,11 +5,11 @@ from typing import Optional
 
 import mcp.types as types
 from mcp import StdioServerParameters
-from mcp.client.stdio import stdio_client
 from opentelemetry import trace
 from uipath import UiPath
 
 from .._utils._config import McpServer
+from ._stdio_client import stdio_client
 from ._tracer import McpTracer
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class SessionServer:
         """Run the local MCP server process."""
         logger.info(f"Starting local MCP Server process for session {self._session_id}")
         self._server_stderr_output = None
-        with tempfile.TemporaryFile(mode='w+b') as stderr_temp:
+        with tempfile.TemporaryFile(mode="w+b") as stderr_temp:
             try:
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
@@ -129,7 +129,9 @@ class SessionServer:
                 )
             finally:
                 stderr_temp.seek(0)
-                self._server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
+                self._server_stderr_output = stderr_temp.read().decode(
+                    "utf-8", errors="replace"
+                )
                 # The context managers will handle cleanup of resources
 
     def _run_server_callback(self, task):
