@@ -100,13 +100,6 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
             try:
                 # Cancel the task group to stop readers/writers
                 tg.cancel_scope.cancel()
-                # Close the pipes explicitly to prevent ResourceWarnings
-                if hasattr(process, "stdin") and process.stdin:
-                    process.stdin.close()
-                if hasattr(process, "stdout") and process.stdout:
-                    process.stdout.close()
-                if hasattr(process, "stderr") and process.stderr:
-                    process.stderr.close()
                 # Then terminate the process with escalating signals
                 process.terminate()
                 try:
