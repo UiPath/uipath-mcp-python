@@ -58,7 +58,7 @@ class SessionServer:
 
     async def on_message_received(self) -> None:
         """Get new incoming messages from UiPath MCP Server."""
-        response = self._uipath.api_client.request(
+        response = await self._uipath.api_client.request_async(
             "GET",
             f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}",
         )
@@ -176,7 +176,7 @@ class SessionServer:
             message, session_id=self._session_id, server_name=self._server_config.name
         ) as span:
             try:
-                response = self._uipath.api_client.request(
+                response = await self._uipath.api_client.request_async(
                     "POST",
                     f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}",
                     json=message.model_dump(),

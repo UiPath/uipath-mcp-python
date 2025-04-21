@@ -297,6 +297,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         # If we got here, initialization was successful and we have the tools
         # Now continue with registration
+        logger.info("Registering server runtime ...")
         try:
             client_info = {
                 "server": {
@@ -318,7 +319,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 client_info["tools"].append(tool_info)
 
             # Register with UiPath MCP Server
-            self._uipath.api_client.request(
+            logger.info(f"Starting register request mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id} ...")
+            await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
@@ -339,7 +341,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Sanboxed runtimes are triggered by new client connections.
         """
         try:
-            response = self._uipath.api_client.request(
+            response = await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/out/message?sessionId={session_id}",
                 json=types.JSONRPCResponse(
@@ -370,7 +372,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Sends a runtime abort signalr to terminate all connected sessions.
         """
         try:
-            response = self._uipath.api_client.request(
+            response = await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}"
             )
