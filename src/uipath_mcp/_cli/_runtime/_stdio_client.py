@@ -98,8 +98,6 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
         finally:
             # Clean up process to prevent any dangling orphaned processes
             try:
-                # Cancel the task group to stop readers/writers
-                tg.cancel_scope.cancel()
                 # Then terminate the process with escalating signals
                 process.terminate()
                 try:
@@ -116,7 +114,5 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
                     except TimeoutError:
                         # Force kill if it doesn't terminate
                         process.kill()
-                # Give the event loop a chance to clean up
-                await anyio.sleep(0.1)
             except Exception:
                 pass
