@@ -276,7 +276,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             stderr_temp.seek(0)
                             server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
                             # We'll handle this after exiting the context managers
-
+                    logger.info("Exiting client session context")
+                logger.info("Exiting stdio client context")
+            logger.info("Exiting temporary file context")
                         # We don't continue with registration here - we'll do it after the context managers
 
         except BaseException as e:
