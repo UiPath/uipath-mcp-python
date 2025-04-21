@@ -1,3 +1,4 @@
+import signal
 import sys
 from contextlib import asynccontextmanager
 from typing import TextIO
@@ -101,5 +102,14 @@ async def stdio_client(server: StdioServerParameters, errlog: TextIO = sys.stder
                 with anyio.fail_after(2.0):
                     await process.wait()
             except TimeoutError:
-                # Force kill if it doesn't terminate
-                process.kill()
+                try:
+                    if sys.platform == "win32":
+                        # On Windows, simulate Ctrl+C
+                        process.send_signal(signal.CTRL_C_EVENT)
+                    else:
+                        process.send_signal(signal.SIGINT)
+                    with anyio.fail_after(2.0):
+                        await process.wait()
+                except TimeoutError:
+                    # Force kill if it doesn't terminate
+                    process.kill()

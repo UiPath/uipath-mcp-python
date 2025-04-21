@@ -156,7 +156,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         # Add a small delay to allow the server to shut down gracefully
         if sys.platform == "win32":
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
 
     async def _handle_signalr_session_closed(self, args: list) -> None:
         """
