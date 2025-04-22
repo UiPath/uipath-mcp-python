@@ -15,6 +15,8 @@ from ._tracer import McpTracer
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
+MAX_RETRIES = 3
+RETRY_DELAY = 1
 
 class SessionServer:
     """Manages a server process for a specific session."""
@@ -58,21 +60,22 @@ class SessionServer:
 
     async def on_message_received(self) -> None:
         """Get new incoming messages from UiPath MCP Server."""
-        response = await self._uipath.api_client.request_async(
-            "GET",
-            f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}",
-        )
-        if response.status_code == 200:
-            messages = response.json()
-            for message in messages:
-                logger.info(f"Received message: {message}")
-                json_message = types.JSONRPCMessage.model_validate(message)
-                with self._mcp_tracer.create_span_for_message(
-                    json_message,
-                    session_id=self._session_id,
-                    server_name=self._server_config.name,
-                ) as _:
-                    await self._message_queue.put(json_message)
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                await self._get_messages_internal()
+                break
+            except Exception as e:
+                logger.error(
+                    f"Error receiving messages for session {self._session_id}: {e}",
+                    exc_info=True,
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_DELAY)
+                else:
+                    logger.error(
+                        f"Max retries reached for receiving messages in session {self._session_id}"
+                    )
+                    raise
 
     async def stop(self) -> None:
         """Clean up resources and stop the server."""
@@ -176,21 +179,56 @@ class SessionServer:
         """Send new message to UiPath MCP Server."""
         with self._mcp_tracer.create_span_for_message(
             message, session_id=self._session_id, server_name=self._server_config.name
-        ) as span:
-            try:
-                response = await self._uipath.api_client.request_async(
-                    "POST",
-                    f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}",
-                    json=message.model_dump(),
-                )
-                if response.status_code == 202:
-                    logger.info(
-                        f"Outgoing message sent to UiPath MCP Server: {message}"
+        ) as _:
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    await self._send_message_internal(message)
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Error sending message to UiPath MCP Server for session {self._session_id}: {e}",
+                        exc_info=True,
                     )
-                else:
-                    self._mcp_tracer.record_http_error(
-                        span, response.status_code, response.text
-                    )
-            except Exception as e:
-                self._mcp_tracer.record_exception(span, e)
-                raise
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_DELAY)
+                    else:
+                        logger.error(
+                            f"Max retries reached for sending message in session {self._session_id}"
+                        )
+                        raise
+
+    async def _send_message_internal(self, message: types.JSONRPCMessage) -> None:
+        response = await self._uipath.api_client.request_async(
+            "POST",
+            f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}",
+            json=message.model_dump(),
+        )
+        if response.status_code == 202:
+            logger.info(
+                f"Outgoing message sent to UiPath MCP Server: {message}"
+            )
+        elif 500 <= response.status_code < 600:
+            raise Exception(
+                f"{response.status_code} - {response.text}"
+            )
+
+    async def _get_messages_internal(self) -> None:
+        response = await self._uipath.api_client.request_async(
+            "GET",
+            f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}",
+        )
+        if response.status_code == 200:
+            messages = response.json()
+            for message in messages:
+                logger.info(f"Received message: {message}")
+                json_message = types.JSONRPCMessage.model_validate(message)
+                with self._mcp_tracer.create_span_for_message(
+                    json_message,
+                    session_id=self._session_id,
+                    server_name=self._server_config.name,
+                ) as _:
+                    await self._message_queue.put(json_message)
+        elif 500 <= response.status_code < 600:
+            raise Exception(
+                f"{response.status_code} - {response.text}"
+            )
