@@ -380,9 +380,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """
         Heartbeat to keep the runtime available.
         """
-        while True:
+        while not self._cancel_event.is_set():
             try:
                 async def on_keep_alive_response(response: CompletionMessage) -> None:
+                    if response.error:
+                        logger.error(f"Error during keep-alive: {response.error}")
+                        return
                     session_ids = response.result
                     logger.info(f"Active sessions: {session_ids}")
                     # If there are no active sessions and this is a sandbox environment
