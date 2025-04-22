@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import mcp.types as types
 from mcp import ClientSession, StdioServerParameters
 from opentelemetry import trace
-from pysignalr.client import SignalRClient
+from pysignalr.client import CompletionMessage, SignalRClient
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
@@ -42,6 +42,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._session_servers: Dict[str, SessionServer] = {}
         self._session_output: Optional[str] = None
         self._cancel_event = asyncio.Event()
+        self._keep_alive_task: Optional[asyncio.Task] = None
         self._uipath = UiPath()
 
     async def execute(self) -> Optional[UiPathRuntimeResult]:
@@ -91,6 +92,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 # Set up a task to wait for cancellation
                 cancel_task = asyncio.create_task(self._cancel_event.wait())
 
+                self._keep_alive_task = asyncio.create_task(self._keep_alive())
+
                 # Keep the runtime alive
                 # Wait for either the run to complete or cancellation
                 done, pending = await asyncio.wait(
@@ -137,6 +140,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """Clean up all resources."""
 
         await self._on_runtime_abort()
+
+        if self._keep_alive_task:
+            self._keep_alive_task.cancel()
+            try:
+                await self._keep_alive_task
+            except asyncio.CancelledError:
+                pass
 
         for session_id, session_server in self._session_servers.items():
             try:
@@ -276,9 +286,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             stderr_temp.seek(0)
                             server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
                             # We'll handle this after exiting the context managers
-                    logger.info("Exiting client session context")
-                logger.info("Exiting stdio client context")
-            logger.info("Exiting temporary file context")
                         # We don't continue with registration here - we'll do it after the context managers
 
         except BaseException as e:
@@ -368,6 +375,31 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             logger.error(
                 f"Error sending session dispose signal to UiPath MCP Server: {e}"
             )
+
+    async def _keep_alive(self) -> None:
+        """
+        Heartbeat to keep the runtime available.
+        """
+        while True:
+            try:
+                async def on_keep_alive_response(response: CompletionMessage) -> None:
+                    session_ids = response.result
+                    logger.info(f"Active sessions: {session_ids}")
+                    # If there are no active sessions and this is a sandbox environment
+                    # We need to cancel the runtime
+                    # eg: when user kills the agent that triggered the runtime, before we subscribe to events
+                    if not session_ids and self.sandboxed and not self._cancel_event.is_set():
+                        logger.error("No active sessions, cancelling sandboxed runtime...")
+                        self._cancel_event.set()
+                await self._signalr_client.send(
+                    method="OnKeepAlive",
+                    arguments=[],
+                    on_invocation=on_keep_alive_response
+                )
+            except Exception as e:
+                logger.error(f"Error during keep-alive: {e}")
+            await asyncio.sleep(60)
+
 
     async def _on_runtime_abort(self) -> None:
         """
