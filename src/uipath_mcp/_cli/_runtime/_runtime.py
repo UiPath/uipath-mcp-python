@@ -328,7 +328,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 client_info["tools"].append(tool_info)
 
             # Register with UiPath MCP Server
-            logger.info(f"Starting register request mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id} ...")
             await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",

@@ -28,7 +28,7 @@ async def mcp_init_middleware_async(entrypoint: str) -> MiddlewareResult:
             entrypoint_data = {
                 "filePath": server.name,
                 "uniqueId": str(uuid.uuid4()),
-                "type": "agent",
+                "type": "mcpserver",
                 "input": {},
                 "output": {}
             }
