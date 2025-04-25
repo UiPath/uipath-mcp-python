@@ -1,0 +1,18 @@
+name: GitHub Helper Agent
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  trigger-uipath-agent:
+    if: startsWith(github.event.comment.body, '/help')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Python dependencies
+        run: pip install requests
+      - name: Trigger UiPath Agent
+        env:
+          COMMENT_BODY: ${{ toJson(github.event.comment.body) }}
+        run: |
+          python -c "import requests; import json; import os; import re; import base64; comment_json = os.environ['COMMENT_BODY']; comment = json.loads(comment_json); command = re.search(r'/help\s+(\w+)', comment); command_value = command.group(1) if command else 'help'; number = ${{ github.event.issue.number || github.event.pull_request.number || 0 }}; payload = json.dumps({'owner': '${{ github.repository_owner }}', 'repo': '${{ github.event.repository.name }}', 'pullNumber': number, 'command': command_value, 'commentNumber': ${{ github.event.comment.id }}}); resp = requests.post('${{ secrets.UIPATH_URL }}/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs', headers={'Authorization': 'Bearer ${{ secrets.UIPATH_ACCESS_TOKEN }}', 'Content-Type': 'application/json', 'X-UiPath-FolderPath': 'MCP Folder'}, json={'startInfo': {'releaseName': 'github-helper-agent', 'inputArguments': payload}}); print(f'Status code: {resp.status_code}'); print(f'Response: {resp.text}')"

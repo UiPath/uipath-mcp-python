@@ -1,0 +1,173 @@
+{
+  "entryPoints": [
+    {
+      "filePath": "agent",
+      "uniqueId": "c9bf75a7-8204-4b22-95c5-eb95ce479ca7",
+      "type": "agent",
+      "input": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "pullNumber": {
+            "title": "Pullnumber",
+            "type": "integer"
+          },
+          "commentNumber": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commentnumber"
+          },
+          "command": {
+            "default": "review",
+            "title": "Command",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "pullNumber",
+          "commentNumber"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": true,
+              "description": "Base abstract message class.\n\nMessages are the inputs and outputs of ChatModels.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": true,
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "additional_kwargs": {
+                  "additionalProperties": true,
+                  "title": "Additional Kwargs",
+                  "type": "object"
+                },
+                "response_metadata": {
+                  "additionalProperties": true,
+                  "title": "Response Metadata",
+                  "type": "object"
+                },
+                "type": {
+                  "title": "Type",
+                  "type": "string"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Name"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                }
+              },
+              "required": [
+                "content",
+                "type"
+              ],
+              "title": "BaseMessage",
+              "type": "object"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "pull_number": {
+            "title": "Pull Number",
+            "type": "integer"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "in_reply_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In Reply To"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          }
+        },
+        "required": [
+          "messages",
+          "owner",
+          "repo",
+          "pull_number",
+          "branch",
+          "command"
+        ]
+      }
+    }
+  ],
+  "bindings": {
+    "version": "2.0",
+    "resources": []
+  }
+}

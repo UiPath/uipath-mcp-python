@@ -1,0 +1,11 @@
+[project]
+name = "github-helper-agent"
+version = "0.0.30"
+description = "An automated agent that reviews GitHub pull requests and provides feedback"
+authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
+dependencies = [
+    "uipath-langchain==0.0.93",
+    "langgraph>=0.3.34",
+    "langchain-mcp-adapters>=0.0.9"
+]
+requires-python = ">=3.10"
