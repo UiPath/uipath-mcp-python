@@ -1,0 +1,14 @@
+name: Documentation Agent
+on:
+  issues:
+    types: [opened]
+jobs:
+  trigger-uipath-docs-agent:
+    if: contains(github.event.issue.title, '[Docs Agent]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Python dependencies
+        run: pip install requests
+      - name: Trigger UiPath Documentation Agent
+        run: |
+          python -c "import requests; import json; resp = requests.post('${{ secrets.UIPATH_URL }}/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs', headers={'Authorization': 'Bearer ${{ secrets.UIPATH_ACCESS_TOKEN }}', 'Content-Type': 'application/json', 'X-UiPath-FolderPath': 'MCP Folder'}, json={'startInfo': {'releaseName': 'github-documentation-agent', 'inputArguments': json.dumps({'messages': [{'role': 'user', 'content': '${{ github.event.issue.title }}\n\n${{ github.event.issue.body }}'}], 'owner': '${{ github.repository_owner }}', 'repo': '${{ github.event.repository.name }}', 'issueNumber': ${{ github.event.issue.number }}})}}); print(f'Status code: {resp.status_code}'); print(f'Response: {resp.text}')"
