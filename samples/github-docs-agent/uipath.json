@@ -1,0 +1,211 @@
+{
+  "entryPoints": [
+    {
+      "filePath": "agent",
+      "uniqueId": "edb47a3e-af7a-46e9-a7dc-5f8132ba31cf",
+      "type": "agent",
+      "input": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": true,
+              "description": "Base abstract message class.\n\nMessages are the inputs and outputs of ChatModels.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": true,
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "additional_kwargs": {
+                  "additionalProperties": true,
+                  "title": "Additional Kwargs",
+                  "type": "object"
+                },
+                "response_metadata": {
+                  "additionalProperties": true,
+                  "title": "Response Metadata",
+                  "type": "object"
+                },
+                "type": {
+                  "title": "Type",
+                  "type": "string"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Name"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                }
+              },
+              "required": [
+                "content",
+                "type"
+              ],
+              "title": "BaseMessage",
+              "type": "object"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "issueNumber": {
+            "title": "Issuenumber",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "messages",
+          "owner",
+          "repo",
+          "issueNumber"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": true,
+              "description": "Base abstract message class.\n\nMessages are the inputs and outputs of ChatModels.",
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": true,
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ],
+                  "title": "Content"
+                },
+                "additional_kwargs": {
+                  "additionalProperties": true,
+                  "title": "Additional Kwargs",
+                  "type": "object"
+                },
+                "response_metadata": {
+                  "additionalProperties": true,
+                  "title": "Response Metadata",
+                  "type": "object"
+                },
+                "type": {
+                  "title": "Type",
+                  "type": "string"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Name"
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                }
+              },
+              "required": [
+                "content",
+                "type"
+              ],
+              "title": "BaseMessage",
+              "type": "object"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "issueNumber": {
+            "title": "Issuenumber",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "messages",
+          "owner",
+          "repo",
+          "issueNumber"
+        ]
+      }
+    }
+  ],
+  "bindings": {
+    "version": "2.0",
+    "resources": []
+  }
+}
