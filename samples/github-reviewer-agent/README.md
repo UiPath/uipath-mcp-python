@@ -11,7 +11,7 @@ The agent uses:
 
 ## Architecture
 
-```mermeid
+```mermaid
 ---
 config:
   flowchart:
