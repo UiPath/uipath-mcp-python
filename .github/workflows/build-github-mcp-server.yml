@@ -49,6 +49,7 @@ jobs:
         run: |
           mkdir -p temp
           cp cmd/github-mcp-server/github-mcp-server temp
+          chmod +x temp/github-mcp-server
 
       - name: Create MCP config file
         run: |
@@ -56,8 +57,8 @@ jobs:
           {
             "servers": {
               "github": {
-                "command": "github-mcp-server",
-                "args": ["stdio"],
+                "command": "/bin/sh",
+                "args": ["-c", "chmod +x github-mcp-server && ./github-mcp-server stdio"],
                 "env": {
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "x"
                 }
@@ -75,7 +76,7 @@ jobs:
           description = "Official GitHub MCP Server"
           authors = [{ name = "John Doe" }]
           dependencies = [
-              "uipath-mcp==0.0.71",
+              "uipath-mcp==0.0.74",
           ]
           requires-python = ">=3.10"
           EOF
