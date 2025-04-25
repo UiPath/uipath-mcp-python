@@ -1,0 +1,11 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "math-server",
+            "uniqueId": "e3af81cd-7696-425e-82a7-15c2b6fc362e",
+            "type": "mcpserver",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
