@@ -1,0 +1,25 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	hydrate_history(hydrate_history)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> hydrate_history;
+	agent___end__ --> __end__;
+	hydrate_history --> agent___start__;
+	subgraph agent
+	agent___start__(<p>__start__</p>)
+	agent_agent(agent)
+	agent_tools(tools)
+	agent___end__(<p>__end__</p>)
+	agent___start__ --> agent_agent;
+	agent_tools --> agent_agent;
+	agent_agent -.-> agent_tools;
+	agent_agent -.-> agent___end__;
+	end
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

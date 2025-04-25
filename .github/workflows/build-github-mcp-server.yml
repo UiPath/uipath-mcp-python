@@ -1,0 +1,117 @@
+name: Build and Publish GitHub MCP Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g. 0.0.1)'
+        required: true
+        default: '0.0.1'
+        type: string
+      uipath_access_token:
+        description: 'UiPath Access Token'
+        required: true
+        type: string
+      uipath_url:
+        description: 'UiPath URL'
+        required: true
+        default: 'https://alpha.uipath.com/ada/byoa'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: github/github-mcp-server
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build MCP Server
+        run: |
+          cd cmd/github-mcp-server
+          go build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install UV
+        run: pip install uv
+
+      - name: Prepare package directory
+        run: |
+          mkdir -p temp
+          cp cmd/github-mcp-server/github-mcp-server temp
+          chmod +x temp/github-mcp-server
+
+      - name: Create MCP config file
+        run: |
+          cat > temp/mcp.json << EOF
+          {
+            "servers": {
+              "github": {
+                "command": "/bin/sh",
+                "args": ["-c", "chmod +x github-mcp-server && ./github-mcp-server stdio"],
+                "env": {
+                  "GITHUB_PERSONAL_ACCESS_TOKEN": "x"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Create pyproject.toml
+        run: |
+          cat > temp/pyproject.toml << EOF
+          [project]
+          name = "mcp-github-server"
+          version = "${{ github.event.inputs.version }}"
+          description = "Official GitHub MCP Server"
+          authors = [{ name = "John Doe" }]
+          dependencies = [
+              "uipath-mcp==0.0.74",
+          ]
+          requires-python = ">=3.10"
+          EOF
+
+      - name: Create .env file
+        run: |
+          cat > temp/.env << EOF
+          UIPATH_ACCESS_TOKEN=${{ github.event.inputs.uipath_access_token }}
+          UIPATH_URL=${{ github.event.inputs.uipath_url }}
+          EOF
+
+      - name: Setup Python environment and package
+        working-directory: ./temp
+        run: |
+          # Create and activate virtual environment
+          uv venv -p 3.10 .venv
+          source .venv/bin/activate
+
+          # Install dependencies
+          uv sync
+
+          # Initialize uipath
+          uipath init
+
+          # Modify uipath.json to add settings
+          python -c "import json; f=open('uipath.json','r'); data=json.load(f); f.close(); data['settings']={'filesIncluded':['github-mcp-server']}; f=open('uipath.json','w'); json.dump(data,f,indent=4); f.close(); print('Updated uipath.json')"
+
+          # Show the modified file
+          cat uipath.json
+
+          # Continue with packing
+          uipath pack
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-github-server-${{ github.event.inputs.version }}
+          path: temp/.uipath/mcp-github-server.${{ github.event.inputs.version }}.nupkg
