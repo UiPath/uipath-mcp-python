@@ -1,6 +1,6 @@
 [project]
 name = "github-docs-agent"
-version = "0.0.2"
+version = "0.0.3"
 description = "An automated agent that writes documentation"
 authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
 dependencies = [
