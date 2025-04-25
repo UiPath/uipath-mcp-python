@@ -28,7 +28,7 @@ async def make_graph():
 
         tools = client.get_tools()
         print(tools)
-        model = ChatAnthropic(model="claude-3-5-sonnet-latest")
+        model = ChatAnthropic(model="claude-3-7-sonnet-20250219")
 
         def doc_writer_prompt(state: IssueState):
             """Create a prompt that incorporates documentation writing instructions."""
@@ -59,7 +59,7 @@ async def make_graph():
         - path: The full file path for the documentation
         - branch: The branch name (create a new one like "docs/issue-{state["issueNumber"]}")
         - message: A clear commit message
-        - content: The complete documentation content
+        - content: The complete file content
 
         ## PR Creation Guidelines
         After creating documentation files, open a pull request that:
