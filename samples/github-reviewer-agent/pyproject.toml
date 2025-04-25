@@ -1,6 +1,6 @@
 [project]
 name = "github-reviewer-agent"
-version = "0.0.3"
+version = "0.0.4"
 description = "An automated agent that reviews GitHub pull requests and provides feedback"
 authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
 dependencies = [

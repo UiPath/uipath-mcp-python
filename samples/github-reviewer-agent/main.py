@@ -35,7 +35,8 @@ async def make_graph():
             system_message = f"""You are a professional Python developer with experience in code reviews.
             You are reviewing a PR for repo: {state["owner"]}/{state["repo"]}, PR #{state["pullNumber"]}.
             Your task is to analyze the code changes in the PR and provide feedback.
-            Use the available tools to fetch PR details and provide a thorough code review."""
+            Use the available tools to fetch PR details and provide a thorough code review.
+            Please post the review in the PR comments."""
 
             return [{"role": "system", "content": system_message}] + state["messages"]
 
