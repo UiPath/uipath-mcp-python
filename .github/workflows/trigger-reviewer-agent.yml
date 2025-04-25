@@ -1,0 +1,16 @@
+name: PR Review Bot
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  trigger-uipath-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Trigger UiPath PR Review
+        run: |
+          python -c "import requests; import json; resp = requests.post('${{ secrets.UIPATH_URL }}/orchestrator_/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs', headers={'Authorization': 'Bearer ${{ secrets.UIPATH_ACCESS_TOKEN }}', 'Content-Type': 'application/json', 'X-UiPath-FolderPath': 'MCP Folder'}, json={'startInfo': {'releaseName': 'github-reviewer-agent', 'inputArguments': json.dumps({'messages': [{'role': 'user', 'content': 'Review this PR and provide detailed feedback'}], 'owner': '${{ github.repository_owner }}', 'repo': '${{ github.event.repository.name }}', 'pullNumber': ${{ github.event.pull_request.number }}})}}); print(f'Status code: {resp.status_code}'); print(f'Response: {resp.text}')"
