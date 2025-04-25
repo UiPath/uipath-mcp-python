@@ -19,7 +19,7 @@ from uipath._cli._runtime._contracts import (
 from uipath.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
-from ._context import UiPathMcpRuntimeContext
+from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
 from ._stdio_client import stdio_client
@@ -313,14 +313,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": self._server.name,
                     "Slug": self._server.name,
                     "Version": "1.0.0",
-                    "Type": 1 if self.sandboxed else 3,
+                    "Type": UiPathServerType.External.value if self.sandboxed else UiPathServerType.Hosted.value,
                 },
                 "tools": [],
             }
 
             for tool in tools_result.tools:
                 tool_info = {
-                    "Type": 1,
                     "Name": tool.name,
                     "ProcessType": "Tool",
                     "Description": tool.description,
