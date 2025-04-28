@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import mcp.types as types
 from mcp import ClientSession, StdioServerParameters
-from opentelemetry import trace
+from opentelmetry import trace
 from pysignalr.client import CompletionMessage, SignalRClient
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
@@ -16,10 +16,10 @@ from uipath._cli._runtime._contracts import (
     UiPathErrorCategory,
     UiPathRuntimeResult,
 )
-from uipath.tracing import wait_for_tracers
+from uipath._cli._runtime.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
-from ._context import UiPathMcpRuntimeContext
+from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
 from ._stdio_client import stdio_client
@@ -61,7 +61,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if self._server is None:
                 return None
 
-            # Set up SignalR client
+            # Set up SignalR Client
             signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
 
             with tracer.start_as_current_span(self._server.name) as root_span:
@@ -138,7 +138,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def cleanup(self) -> None:
         """Clean up all resources."""
-
         await self._on_runtime_abort()
 
         if self._keep_alive_task:
@@ -191,9 +190,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         logger.info(
                             f"Session {session_id} output: {session_server.output}"
                         )
-            # If this is a sandboxed runtime for a specific session, cancel the execution
-            if self.sandboxed:
-                self._cancel_event.set()
+                # If this is a sandboxed runtime for a specific session, cancel the execution
+                if self.sandboxed:
+                    self._cancel_event.set()
 
         except Exception as e:
             logger.error(f"Error terminating session {session_id}: {str(e)}")
@@ -269,24 +268,21 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     read,
                     write,
                 ):
-                    async with ClientSession(read, write) as session:
-                        logger.info("Initializing client session...")
-                        # Try to initialize with timeout
-                        try:
-                            await asyncio.wait_for(session.initialize(), timeout=30)
-                            initialization_successful = True
-                            logger.info("Initialization successful")
-
-                            # Only proceed if initialization was successful
-                            tools_result = await session.list_tools()
-                            logger.info(tools_result)
-                        except asyncio.TimeoutError:
-                            logger.error("Initialization timed out")
-                            # Capture stderr output here, after the timeout
-                            stderr_temp.seek(0)
-                            server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
-                            # We'll handle this after exiting the context managers
-                        # We don't continue with registration here - we'll do it after the context managers
+                    logger.info("Initializing client session...")
+                    # Try to initialize with timeout
+                    try:
+                        await asyncio.wait_for(read.initialize(), timeout=30)
+                        initialization_successful = True
+                        logger.info("Initialization successful")
+                        # Only proceed if initialization was successful
+                        tools_result = await read.list_tools()
+                        logger.info(tools_result)
+                    except asyncio.TimeoutError:
+                        logger.error("Initialization timed out")
+                        # Capture stderr output here, after the timeout
+                        stderr_temp.seek(0)
+                        server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
+                        # We'll handle this after exiting the context managers
 
         except BaseException as e:
             logger.error(f"Error during server initialization: {e}")
@@ -313,7 +309,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": self._server.name,
                     "Slug": self._server.name,
                     "Version": "1.0.0",
-                    "Type": 1 if self.sandboxed else 3,
+                    "Type": UiPathServerType.External.value if self.sandboxed else UiPathServerType.Hosted.value,
                 },
                 "tools": [],
             }
@@ -346,7 +342,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def _on_session_start_error(self, session_id: str) -> None:
         """
         Sends a dummy initialization failure message to abort the already connected client.
-        Sanboxed runtimes are triggered by new client connections.
+        Sandboxed runtimes are triggered by new client connections.
         """
         try:
             response = await self._uipath.api_client.request_async(
@@ -402,7 +398,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 logger.error(f"Error during keep-alive: {e}")
             await asyncio.sleep(60)
 
-
     async def _on_runtime_abort(self) -> None:
         """
         Sends a runtime abort signalr to terminate all connected sessions.
@@ -418,7 +413,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 )
             else:
                 logger.error(
-                    f"Error sending runtime abort signalr to UiPath MCP Server: {response.status_code} - {response.text}"
+                    f"Error sending runtime abort signal to UiPath MCP Server: {response.status_code} - {response.text}"
                 )
         except Exception as e:
             logger.error(

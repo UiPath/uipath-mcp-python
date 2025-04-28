@@ -1,15 +1,13 @@
+from typing import Optional
 from enum import Enum
-from typing import Optional, Dict
 
 from uipath._cli._runtime._contracts import UiPathRuntimeContext
 
 from .._utils._config import McpConfig
 
-
 class UiPathMcpRuntimeContext(UiPathRuntimeContext):
     """Context information passed throughout the runtime execution."""
     config: Optional[McpConfig] = None
-
 
 class UiPathServerType(Enum):
     """Defines the different types of UiPath servers used in the MCP ecosystem.
