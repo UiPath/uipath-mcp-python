@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict
 
 from uipath._cli._runtime._contracts import UiPathRuntimeContext
 
@@ -24,7 +24,26 @@ class UiPathServerType(Enum):
         Local (2): Local MCP server (PackageType.MCPServer)
         Hosted (3): Tunnel to externally hosted server
     """
-    UiPath = 0  # Processes, Agents, Activities
-    External = 1  # npx, uvx
-    Local = 2  # PackageType.MCPServer
-    Hosted = 3  # tunnel to externally hosted server
+    UiPath = 0  # type: int - Processes, Agents, Activities
+    External = 1  # type: int - npx, uvx
+    Local = 2  # type: int - PackageType.MCPServer
+    Hosted = 3  # type: int - tunnel to externally hosted server
+    
+    @classmethod
+    def from_string(cls, name: str) -> 'UiPathServerType':
+        """Get enum value from string name."""
+        try:
+            return cls[name]
+        except KeyError:
+            raise ValueError(f"Unknown server type: {name}")
+            
+    @classmethod
+    def get_description(cls, server_type: 'UiPathServerType') -> str:
+        """Get description for a server type."""
+        descriptions = {
+            cls.UiPath: "Standard UiPath server for Processes, Agents, and Activities",
+            cls.External: "External server types like npx, uvx",
+            cls.Local: "Local MCP server (PackageType.MCPServer)",
+            cls.Hosted: "Tunnel to externally hosted server"
+        }
+        return descriptions.get(server_type, "Unknown server type")
