@@ -62,7 +62,9 @@ class McpTracer:
                 span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("error_code", root_value.error.code)
-                span.set_attribute("error_message", root_value.error.message)
+                span.set_attribute("error", root_value.error.message)
+                span.set_status(StatusCode.ERROR)
+
 
             # Remove the request from active tracking
             self._active_request_spans.pop(request_id, None)
@@ -99,7 +101,8 @@ class McpTracer:
                 span.set_attribute("span_type", "MCP error")
                 span.set_attribute("id", str(root_value.id))
                 span.set_attribute("error_code", root_value.error.code)
-                span.set_attribute("error_message", root_value.error.message)
+                span.set_attribute("error", root_value.error.message)
+                span.set_status(StatusCode.ERROR)
             else:
                 span = self._tracer.start_span("unknown")
                 span.set_attribute("span_type", str(type(root_value).__name__))
