@@ -18,7 +18,7 @@ The agent consists of three main components:
 
 The agent responds to the following commands:
 
-- Reviewer: `/help suggest`, `/help review`, `/help test`
+- Reviewer: `/help summarize`, `/help suggest`, `/help review`, `/help test`
 - Developer: `/help commit` (commits the latest suggestion/review/tests)
 
 ## Architecture
