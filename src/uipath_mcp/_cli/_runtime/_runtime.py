@@ -202,11 +202,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """
         Handle incoming SignalR messages.
         """
-        if len(args) < 1:
+        if len(args) < 2:
             logger.error(f"Received invalid websocket message arguments: {args}")
             return
 
         session_id = args[0]
+        request_id = args[1]
 
         logger.info(f"Received websocket notification... {session_id}")
 
@@ -229,7 +230,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             session_server = self._session_servers[session_id]
 
             # Forward the message to the session's MCP server
-            await session_server.on_message_received()
+            await session_server.on_message_received(request_id)
 
         except Exception as e:
             logger.error(
