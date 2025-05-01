@@ -58,11 +58,11 @@ class SessionServer:
             await self.stop()
             raise
 
-    async def on_message_received(self) -> None:
+    async def on_message_received(self, request_id: str) -> None:
         """Get new incoming messages from UiPath MCP Server."""
         for attempt in range(MAX_RETRIES + 1):
             try:
-                await self._get_messages_internal()
+                await self._get_messages_internal(request_id)
                 break
             except Exception as e:
                 logger.error(
@@ -116,7 +116,7 @@ class SessionServer:
                     try:
                         while True:
                             message = await self._read_stream.receive()
-                            await self._send_message(message)
+                            await self._send_message(message, request_id=self._last_request_id)
                     finally:
                         # Cancel the consumer when we exit the loop
                         consumer_task.cancel()
@@ -153,12 +153,13 @@ class SessionServer:
         """Consume messages from the queue and send them to the local server."""
         try:
             while True:
-                message = await self._message_queue.get()
+                message, request_id = await self._message_queue.get()
                 try:
                     if self._write_stream:
                         logger.info(
                             f"Session {self._session_id} - processing queued message: {message}..."
                         )
+                        self._last_request_id = request_id
                         await self._write_stream.send(message)
                 except Exception as e:
                     logger.error(
@@ -175,14 +176,14 @@ class SessionServer:
                 except asyncio.QueueEmpty:
                     break
 
-    async def _send_message(self, message: types.JSONRPCMessage) -> None:
+    async def _send_message(self, message: types.JSONRPCMessage, request_id: str) -> None:
         """Send new message to UiPath MCP Server."""
         with self._mcp_tracer.create_span_for_message(
             message, session_id=self._session_id, server_name=self._server_config.name
         ) as _:
             for attempt in range(MAX_RETRIES + 1):
                 try:
-                    await self._send_message_internal(message)
+                    await self._send_message_internal(message, request_id)
                     break
                 except Exception as e:
                     logger.error(
@@ -197,10 +198,10 @@ class SessionServer:
                         )
                         raise
 
-    async def _send_message_internal(self, message: types.JSONRPCMessage) -> None:
+    async def _send_message_internal(self, message: types.JSONRPCMessage, request_id: str) -> None:
         response = await self._uipath.api_client.request_async(
             "POST",
-            f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}",
+            f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}&requestId={request_id}",
             json=message.model_dump(),
         )
         if response.status_code == 202:
@@ -212,10 +213,10 @@ class SessionServer:
                 f"{response.status_code} - {response.text}"
             )
 
-    async def _get_messages_internal(self) -> None:
+    async def _get_messages_internal(self, request_id: str) -> None:
         response = await self._uipath.api_client.request_async(
             "GET",
-            f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}",
+            f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}&requestId={request_id}",
         )
         if response.status_code == 200:
             messages = response.json()
@@ -227,7 +228,7 @@ class SessionServer:
                     session_id=self._session_id,
                     server_name=self._server_config.name,
                 ) as _:
-                    await self._message_queue.put(json_message)
+                    await self._message_queue.put((json_message, request_id))
         elif 500 <= response.status_code < 600:
             raise Exception(
                 f"{response.status_code} - {response.text}"
