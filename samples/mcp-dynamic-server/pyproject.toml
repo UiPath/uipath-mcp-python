@@ -1,0 +1,9 @@
+[project]
+name = "mcp-dynamic-server"
+version = "0.0.3"
+description = "Dynamic tools MCP Server"
+authors = [{ name = "John Doe" }]
+dependencies = [
+    "uipath-mcp==0.0.77",
+]
+requires-python = ">=3.10"

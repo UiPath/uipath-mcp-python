@@ -1,0 +1,11 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "dynamic-server",
+            "uniqueId": "5182e8b1-ab65-4dda-93eb-c56b8ebde8da",
+            "type": "mcpserver",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
