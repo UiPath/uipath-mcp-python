@@ -76,7 +76,7 @@ jobs:
           description = "Official GitHub MCP Server"
           authors = [{ name = "John Doe" }]
           dependencies = [
-              "uipath-mcp==0.0.74",
+              "uipath-mcp>=0.0.78",
           ]
           requires-python = ">=3.10"
           EOF
