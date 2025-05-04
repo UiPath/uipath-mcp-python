@@ -19,7 +19,7 @@ from uipath._cli._runtime._contracts import (
 from uipath.tracing import wait_for_tracers
 
 from .._utils._config import McpServer
-from ._context import UiPathMcpRuntimeContext
+from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
 from ._stdio_client import stdio_client
@@ -37,7 +37,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         super().__init__(context)
         self.context: UiPathMcpRuntimeContext = context
         self._server: Optional[McpServer] = None
-        self._runtime_id = self.context.job_id if self.context.job_id else str(uuid.uuid4())
+        self._runtime_id = (
+            self.context.job_id if self.context.job_id else str(uuid.uuid4())
+        )
         self._signalr_client: Optional[SignalRClient] = None
         self._session_servers: Dict[str, SessionServer] = {}
         self._session_output: Optional[str] = None
@@ -152,9 +154,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             try:
                 await session_server.stop()
             except Exception as e:
-                logger.error(
-                    f"Error cleaning up session server {session_id}: {str(e)}"
-                )
+                logger.error(f"Error cleaning up session server {session_id}: {str(e)}")
 
         if self._signalr_client and hasattr(self._signalr_client, "_transport"):
             transport = self._signalr_client._transport
@@ -265,7 +265,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Start a temporary stdio client to get tools
             # Use a temporary file to capture stderr
-            with tempfile.TemporaryFile(mode='w+b') as stderr_temp:
+            with tempfile.TemporaryFile(mode="w+b") as stderr_temp:
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
                     write,
@@ -285,7 +285,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             logger.error("Initialization timed out")
                             # Capture stderr output here, after the timeout
                             stderr_temp.seek(0)
-                            server_stderr_output = stderr_temp.read().decode('utf-8', errors='replace')
+                            server_stderr_output = stderr_temp.read().decode(
+                                "utf-8", errors="replace"
+                            )
                             # We'll handle this after exiting the context managers
                         # We don't continue with registration here - we'll do it after the context managers
 
@@ -314,14 +316,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": self._server.name,
                     "Slug": self._server.name,
                     "Version": "1.0.0",
-                    "Type": 1 if self.sandboxed else 3,
+                    "Type": self.server_type.value,
                 },
                 "tools": [],
             }
 
             for tool in tools_result.tools:
                 tool_info = {
-                    "Type": 1,
                     "Name": tool.name,
                     "ProcessType": "Tool",
                     "Description": tool.description,
@@ -347,7 +348,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def _on_session_start_error(self, session_id: str) -> None:
         """
         Sends a dummy initialization failure message to abort the already connected client.
-        Sanboxed runtimes are triggered by new client connections.
+        Sandboxed runtimes are triggered by new client connections.
         """
         try:
             response = await self._uipath.api_client.request_async(
@@ -382,6 +383,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """
         while not self._cancel_event.is_set():
             try:
+
                 async def on_keep_alive_response(response: CompletionMessage) -> None:
                     if response.error:
                         logger.error(f"Error during keep-alive: {response.error}")
@@ -391,18 +393,24 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     # If there are no active sessions and this is a sandbox environment
                     # We need to cancel the runtime
                     # eg: when user kills the agent that triggered the runtime, before we subscribe to events
-                    if not session_ids and self.sandboxed and not self._cancel_event.is_set():
-                        logger.error("No active sessions, cancelling sandboxed runtime...")
+                    if (
+                        not session_ids
+                        and self.sandboxed
+                        and not self._cancel_event.is_set()
+                    ):
+                        logger.error(
+                            "No active sessions, cancelling sandboxed runtime..."
+                        )
                         self._cancel_event.set()
+
                 await self._signalr_client.send(
                     method="OnKeepAlive",
                     arguments=[],
-                    on_invocation=on_keep_alive_response
+                    on_invocation=on_keep_alive_response,
                 )
             except Exception as e:
                 logger.error(f"Error during keep-alive: {e}")
             await asyncio.sleep(60)
-
 
     async def _on_runtime_abort(self) -> None:
         """
@@ -411,7 +419,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"mcp_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}"
+                f"mcp_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}",
             )
             if response.status_code == 202:
                 logger.info(
@@ -435,3 +443,37 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             bool: True if this is an sandboxed runtime (has a job_id), False otherwise.
         """
         return self.context.job_id is not None
+
+    @property
+    def packaged(self) -> bool:
+        """
+        Check if the runtime is packaged (PackageType.MCPServer).
+
+        Returns:
+            bool: True if this is a packaged runtime (has a process), False otherwise.
+        """
+        process_key = self.context.trace_context.process_key
+
+        return (
+            process_key is not None
+            and process_key != "00000000-0000-0000-0000-000000000000"
+        )
+
+    @property
+    def server_type(self) -> UiPathServerType:
+        """
+        Determine the correct UiPathServerType for this runtime.
+
+        Returns:
+            UiPathServerType: The appropriate server type enum value based on the runtime configuration.
+        """
+        if self.packaged:
+            # If it's a packaged runtime (has a process_key), it's a Local server
+            # Packaged runtimes are also sandboxed
+            return UiPathServerType.Local
+        elif self.sandboxed:
+            # If it's sandboxed but not packaged, it's an External server
+            return UiPathServerType.External
+        else:
+            # If it's neither packaged nor sandboxed, it's a Hosted server
+            return UiPathServerType.Hosted
