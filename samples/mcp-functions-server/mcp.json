@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "functions-server": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["server.py"]
+    }
+  }
+}
