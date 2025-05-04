@@ -1,0 +1,9 @@
+[project]
+name = "mcp-functions-server"
+version = "0.0.1"
+description = "MCP Server that allows dynamic code functions creation and executions"
+authors = [{ name = "John Doe" }]
+dependencies = [
+    "uipath-mcp==0.0.77",
+]
+requires-python = ">=3.10"

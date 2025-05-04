@@ -460,8 +460,8 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-dynamic-server"
-version = "0.0.18"
+name = "mcp-functions-server"
+version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "uipath-mcp" },
