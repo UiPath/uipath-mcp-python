@@ -91,9 +91,8 @@ def add_function(
                 "example": "add_function(name='function_name', code='def function_name(param1: str, param2: str):\\n    # code here\\n    return {\"status\": \"success\"}', description='Function description', inputSchema={'param1': 'Description of param1', 'param2': 'Description of param2'})",
             }
 
-        # Check if function already exists
-        if registry.has_function(name) or hasattr(mcp, name):
-            return {"status": "error", "message": f"Function '{name}' already exists"}
+        # Track if we're replacing an existing function
+        function_exists = registry.has_function(name) or hasattr(mcp, name)
 
         # Validate the code
         try:
@@ -117,15 +116,18 @@ def add_function(
                     "message": f"'{name}' is not a callable function",
                 }
 
-            # Register the function with our registry
+            # Register the function, overwriting if it already exists
             registry.register(name, func, description, inputSchema)
 
             # Get the parameter information to return
             params = registry.get_metadata(name)["inputSchema"]
 
+            # Determine the appropriate status message
+            status_msg = "added" if not function_exists else "updated"
+
             return {
                 "status": "success",
-                "message": f"Function '{name}' added successfully",
+                "message": f"Function '{name}' {status_msg} successfully",
                 "inputSchema": params,
             }
 

@@ -461,14 +461,14 @@ wheels = [
 
 [[package]]
 name = "mcp-functions-server"
-version = "0.0.1"
+version = "0.0.2"
 source = { virtual = "." }
 dependencies = [
     { name = "uipath-mcp" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "uipath-mcp", specifier = "==0.0.77" }]
+requires-dist = [{ name = "uipath-mcp", specifier = ">=0.0.78" }]
 
 [[package]]
 name = "mdurl"
@@ -1197,16 +1197,16 @@ wheels = [
 
 [[package]]
 name = "uipath-mcp"
-version = "0.0.77"
+version = "0.0.78"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
     { name = "pysignalr" },
     { name = "uipath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/29/79/aa6a9ff4970512b6024f01ac2cac22f5efa3263a1b57faf46216d52d12e9/uipath_mcp-0.0.77.tar.gz", hash = "sha256:ffc871b7a2b69b8701cf5c07b0d75892abc0e23dbd09ae8b70d1c171341c8beb", size = 335534 }
+sdist = { url = "https://files.pythonhosted.org/packages/70/b0/3b3253375ea7cf0ac87122520c12a98a87467f8c0b9ceed1d7c65b667cf2/uipath_mcp-0.0.78.tar.gz", hash = "sha256:13a0ad50447b6c662a48c6c1451f3099dc725bfa652e91875c398fc2dea28469", size = 637239 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/b5/5539b346a7fe6990ef0695c91182d953c5f67f7414a04e52d6beab44b801/uipath_mcp-0.0.77-py3-none-any.whl", hash = "sha256:21f545fcb5a35638dec36ceeb97576f07ecec338834e407d929c18994a633d84", size = 20097 },
+    { url = "https://files.pythonhosted.org/packages/b8/c2/8fb6874be85460df6054e3cdca327922ebfd2ba6127db65cfe650874c992/uipath_mcp-0.0.78-py3-none-any.whl", hash = "sha256:fb79fec78e317c360c19c8326e1dd1d7e9b287e353a16d5acffb7679fc245f8e", size = 20900 },
 ]
 
 [[package]]

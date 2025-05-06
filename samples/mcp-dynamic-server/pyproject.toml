@@ -1,6 +1,6 @@
 [project]
 name = "mcp-dynamic-server"
-version = "0.0.18"
+version = "0.0.19"
 description = "Dynamic MCP Server with self-extending tools"
 authors = [{ name = "John Doe" }]
 dependencies = [
