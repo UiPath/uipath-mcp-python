@@ -1,0 +1,11 @@
+[project]
+name = "mcp-coder-agent"
+version = "0.0.4"
+description = "A coder agent that implements and tests Python functions using a dynamic MCP server"
+authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
+dependencies = [
+    "uipath-langchain-nightly>=0.0.109.dev1000870000,<0.0.109.dev1000880000",
+    "langgraph>=0.3.34",
+    "langchain-mcp-adapters>=0.0.9"
+]
+requires-python = ">=3.10"
