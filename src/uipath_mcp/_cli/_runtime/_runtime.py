@@ -7,8 +7,8 @@ import traceback
 import uuid
 from typing import Any, Dict, Optional
 
-import mcp.types as types
 from mcp import ClientSession, StdioServerParameters, stdio_client
+from mcp.types import JSONRPCResponse
 from opentelemetry import trace
 from pysignalr.client import CompletionMessage, SignalRClient
 from uipath import UiPath
@@ -382,7 +382,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             response = await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/out/message?sessionId={session_id}",
-                json=types.JSONRPCResponse(
+                json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
                     result={

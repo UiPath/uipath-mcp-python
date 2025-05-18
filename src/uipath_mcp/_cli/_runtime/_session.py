@@ -3,8 +3,9 @@ import logging
 import tempfile
 from typing import Dict, Optional
 
-import mcp.types as types
 from mcp import StdioServerParameters, stdio_client
+from mcp.shared.message import SessionMessage
+from mcp.types import JSONRPCError, JSONRPCMessage, JSONRPCRequest, JSONRPCResponse
 from opentelemetry import trace
 from uipath import UiPath
 
@@ -118,8 +119,8 @@ class SessionServer:
                     try:
                         while True:
                             # Get message from local server
-                            message = await self._read_stream.receive()
-
+                            session_message = await self._read_stream.receive()
+                            message = session_message.message
                             # For responses, determine which request_id to use
                             if self._is_response(message):
                                 message_id = self._get_message_id(message)
@@ -180,7 +181,7 @@ class SessionServer:
                         logger.info(
                             f"Session {self._session_id} - processing queued message: {message}..."
                         )
-                        await self._write_stream.send(message)
+                        await self._write_stream.send(SessionMessage(message=message))
                 except Exception as e:
                     logger.error(
                         f"Error processing message for session {self._session_id}: {e}"
@@ -196,9 +197,7 @@ class SessionServer:
                 except asyncio.QueueEmpty:
                     break
 
-    async def _send_message(
-        self, message: types.JSONRPCMessage, request_id: str
-    ) -> None:
+    async def _send_message(self, message: JSONRPCMessage, request_id: str) -> None:
         """Send new message to UiPath MCP Server."""
         with self._mcp_tracer.create_span_for_message(
             message,
@@ -224,7 +223,7 @@ class SessionServer:
                         raise
 
     async def _send_message_internal(
-        self, message: types.JSONRPCMessage, request_id: str
+        self, message: JSONRPCMessage, request_id: str
     ) -> None:
         response = await self._uipath.api_client.request_async(
             "POST",
@@ -246,7 +245,7 @@ class SessionServer:
             messages = response.json()
             for message in messages:
                 logger.info(f"Received message: {message}")
-                json_message = types.JSONRPCMessage.model_validate(message)
+                json_message = JSONRPCMessage.model_validate(message)
                 if self._is_request(json_message):
                     message_id = self._get_message_id(json_message)
                     if message_id:
@@ -261,23 +260,21 @@ class SessionServer:
         elif 500 <= response.status_code < 600:
             raise Exception(f"{response.status_code} - {response.text}")
 
-    def _is_request(self, message: types.JSONRPCMessage) -> bool:
+    def _is_request(self, message: JSONRPCMessage) -> bool:
         """Check if a message is a JSONRPCRequest."""
         if hasattr(message, "root"):
             root = message.root
-            return isinstance(root, types.JSONRPCRequest)
+            return isinstance(root, JSONRPCRequest)
         return False
 
-    def _is_response(self, message: types.JSONRPCMessage) -> bool:
+    def _is_response(self, message: JSONRPCMessage) -> bool:
         """Check if a message is a JSONRPCResponse or JSONRPCError."""
         if hasattr(message, "root"):
             root = message.root
-            return isinstance(root, types.JSONRPCResponse) or isinstance(
-                root, types.JSONRPCError
-            )
+            return isinstance(root, JSONRPCResponse) or isinstance(root, JSONRPCError)
         return False
 
-    def _get_message_id(self, message: types.JSONRPCMessage) -> str:
+    def _get_message_id(self, message: JSONRPCMessage) -> str:
         """Extract the message id from a JSONRPCMessage."""
         if hasattr(message, "root") and hasattr(message.root, "id"):
             return str(message.root.id)
