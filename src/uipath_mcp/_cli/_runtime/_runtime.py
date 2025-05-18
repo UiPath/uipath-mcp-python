@@ -3,11 +3,12 @@ import logging
 import os
 import sys
 import tempfile
+import traceback
 import uuid
 from typing import Any, Dict, Optional
 
 import mcp.types as types
-from mcp import ClientSession, StdioServerParameters
+from mcp import ClientSession, StdioServerParameters, stdio_client
 from opentelemetry import trace
 from pysignalr.client import CompletionMessage, SignalRClient
 from uipath import UiPath
@@ -22,7 +23,6 @@ from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
-from ._stdio_client import stdio_client
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -292,7 +292,35 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         # We don't continue with registration here - we'll do it after the context managers
 
         except BaseException as e:
-            logger.error(f"Error during server initialization: {e}")
+            # In Python 3.10, ExceptionGroup is in the 'exceptiongroup' module
+            # and asyncio.TaskGroup wraps exceptions in ExceptionGroup
+            if hasattr(e, "__context__") and e.__context__ is not None:
+                logger.error("Sub-exception details:")
+                logger.error(
+                    "".join(
+                        traceback.format_exception(
+                            type(e.__context__),
+                            e.__context__,
+                            e.__context__.__traceback__,
+                        )
+                    )
+                )
+            elif hasattr(e, "exceptions"):  # For ExceptionGroup
+                for i, sub_exc in enumerate(e.exceptions):
+                    logger.error(f"Sub-exception {i + 1}:")
+                    logger.error(
+                        "".join(
+                            traceback.format_exception(
+                                type(sub_exc), sub_exc, sub_exc.__traceback__
+                            )
+                        )
+                    )
+            else:
+                # Log the full traceback of the exception itself
+                logger.error("Full traceback:")
+                logger.error(
+                    "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                )
 
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
