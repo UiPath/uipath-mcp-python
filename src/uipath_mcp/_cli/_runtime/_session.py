@@ -4,12 +4,11 @@ import tempfile
 from typing import Dict, Optional
 
 import mcp.types as types
-from mcp import StdioServerParameters
+from mcp import StdioServerParameters, stdio_client
 from opentelemetry import trace
 from uipath import UiPath
 
 from .._utils._config import McpServer
-from ._stdio_client import stdio_client
 from ._tracer import McpTracer
 
 logger = logging.getLogger(__name__)
