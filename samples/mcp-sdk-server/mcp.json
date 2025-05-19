@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "sdk-server": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["server.py"]
+    }
+  }
+}
