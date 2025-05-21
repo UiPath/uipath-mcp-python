@@ -3,12 +3,9 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 from uipath import UiPath
-import unirest
 
 mcp = FastMCP(name="Email checker MCP")
 csv_file_name = "processed_or_blacklisted_emails-{0}.csv"
-secret = os.getenv('UIPATH_SECRET')
-check_email_api_key = None
 
 
 def validate_with_check_mail_api(email: str, api_key: str) -> bool:
@@ -43,8 +40,11 @@ def is_temporary_email(email: str) -> bool:
 @mcp.tool()
 async def is_valid_email(email_address: str) -> bool:
     """Verify if email is temporary or not."""
-    if check_email_api_key:
-        return not validate_with_check_mail_api(email_address, check_email_api_key)
+    if check_email_api_key is not None:
+        try:
+            return not validate_with_check_mail_api(email_address, check_email_api_key)
+        except Exception:
+            pass
     return not is_temporary_email(email_address)
 
 

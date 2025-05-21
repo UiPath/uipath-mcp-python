@@ -115,7 +115,7 @@ async def understand_email(state: State) -> Command:
         }
     )
 
-async def check_email(state: State) -> Command:
+async def triage_email(state: State) -> Command:
     async with (agent_mcp(
             os.getenv("UIPATH_MCP_INTERNAL_SERVER_URL"),
             structured_output = OutputStructure,
@@ -138,7 +138,7 @@ async def check_email(state: State) -> Command:
             }
         )
 
-async def analyze_email_and_take_action(state: State) -> Command:
+async def handle_transaction(state: State) -> Command:
     async with agent_mcp(os.getenv("UIPATH_MCP_EXTERNAL_SERVER_URL")) as agent:
         response = await agent.ainvoke(
             {
@@ -155,28 +155,28 @@ async def analyze_email_and_take_action(state: State) -> Command:
 def collect_output(state: State) -> GraphOutput:
     return GraphOutput(answer=str(state.agent_message))
 
-def decide_next_node_after_email_validation(state: State) -> Literal["analyze_email_and_take_action", "collect_output"]:
+def decide_next_node_after_email_validation(state: State) -> Literal["handle_transaction", "collect_output"]:
     if state.should_continue:
-        return "analyze_email_and_take_action"
+        return "handle_transaction"
     return "collect_output"
 
-def decide_next_node_given_email_topic(state: State) -> Literal["collect_output", "check_email"]:
+def decide_next_node_given_email_topic(state: State) -> Literal["collect_output", "triage_email"]:
     if state.email_topic == EmailTopic.OTHER:
         return "collect_output"
-    return "check_email"
+    return "triage_email"
 
 builder = StateGraph(State, input=GraphInput, output=GraphOutput)
 builder.add_node("prepare_input", prepare_input)
-builder.add_node("check_email", check_email)
+builder.add_node("triage_email", triage_email)
 builder.add_node("collect_output", collect_output)
-builder.add_node("analyze_email_and_take_action", analyze_email_and_take_action)
+builder.add_node("handle_transaction", handle_transaction)
 builder.add_node("understand_email", understand_email)
 
 builder.add_edge(START, "prepare_input")
 builder.add_edge("prepare_input", "understand_email")
 builder.add_conditional_edges("understand_email", decide_next_node_given_email_topic)
-builder.add_conditional_edges("check_email", decide_next_node_after_email_validation)
-builder.add_edge("analyze_email_and_take_action", "collect_output")
+builder.add_conditional_edges("triage_email", decide_next_node_after_email_validation)
+builder.add_edge("handle_transaction", "collect_output")
 builder.add_edge("collect_output", END)
 
 
