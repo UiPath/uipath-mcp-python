@@ -357,6 +357,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 }
                 client_info["tools"].append(tool_info)
 
+            logger.info(client_info)
+
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
                 "POST",
@@ -366,6 +368,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             logger.info("Registered MCP Server type successfully")
         except Exception as e:
             logger.error(f"Error during registration: {e}")
+            if (e.status_code == 400):
+                logger.error(f"Error details: {e.response.text}")
+
             raise UiPathMcpRuntimeError(
                 "REGISTRATION_ERROR",
                 "Failed to register MCP Server",
