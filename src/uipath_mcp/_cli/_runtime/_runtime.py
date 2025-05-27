@@ -10,6 +10,8 @@ from typing import Any, Dict, Optional
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.types import JSONRPCResponse
 from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pysignalr.client import CompletionMessage, SignalRClient
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
@@ -17,7 +19,7 @@ from uipath._cli._runtime._contracts import (
     UiPathErrorCategory,
     UiPathRuntimeResult,
 )
-from uipath.tracing import wait_for_tracers
+from uipath.tracing import LlmOpsHttpExporter
 
 from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext, UiPathServerType
@@ -62,6 +64,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             if self._server is None:
                 return None
+            
+            self.trace_provider = TracerProvider()
+            trace.set_tracer_provider(self.trace_provider)
+            self.trace_provider.add_span_processor(
+                BatchSpanProcessor(LlmOpsHttpExporter())
+            )  # type: ignore
 
             # Set up SignalR client
             signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
@@ -125,7 +133,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.USER,
             ) from e
         finally:
-            wait_for_tracers()
+            self.trace_provider.shutdown()
 
     async def validate(self) -> None:
         """Validate runtime inputs and load MCP server configuration."""
