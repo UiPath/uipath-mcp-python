@@ -64,7 +64,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             if self._server is None:
                 return None
-            
+
             self.trace_provider = TracerProvider()
             trace.set_tracer_provider(self.trace_provider)
             self.trace_provider.add_span_processor(
@@ -262,13 +262,21 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         initialization_successful = False
         tools_result = None
         server_stderr_output = ""
+        env_vars = self._server.env
+
+        # if server is Local, include environment variables
+        if self.server_type is UiPathServerType.Local:
+            for name, value in os.environ.items():
+                # config env variables should have precedence over system ones
+                if name not in env_vars:
+                    env_vars[name] = value
 
         try:
             # Create a temporary session to get tools
             server_params = StdioServerParameters(
                 command=self._server.command,
                 args=self._server.args,
-                env=self._server.env,
+                env=env_vars,
             )
 
             # Start a temporary stdio client to get tools
