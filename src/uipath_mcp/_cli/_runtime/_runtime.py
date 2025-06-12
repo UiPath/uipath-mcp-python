@@ -268,6 +268,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 "Please set the UIPATH_FOLDER_KEY environment variable.",
                 UiPathErrorCategory.USER,
             )
+        logger.info(f"Folder key: {folder_key}")
 
         initialization_successful = False
         tools_result = None
