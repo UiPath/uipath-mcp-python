@@ -259,6 +259,16 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
+
+        folder_key = os.environ.get("UIPATH_FOLDER_KEY")
+        if not folder_key:
+            raise UiPathMcpRuntimeError(
+                "REGISTRATION_ERROR",
+                "No UIPATH_FOLDER_KEY environment variable set.",
+                "Please set the UIPATH_FOLDER_KEY environment variable.",
+                UiPathErrorCategory.USER,
+            )
+
         initialization_successful = False
         tools_result = None
         server_stderr_output = ""
@@ -374,14 +384,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 client_info["tools"].append(tool_info)
 
             logger.info(client_info)
-
-            folder_key = os.environ.get("UIPATH_FOLDER_KEY")
-            if not folder_key:
-                raise UiPathMcpRuntimeError(
-                    "REGISTRATION_ERROR",
-                    "No UIPATH_FOLDER_KEY environment variable set.",
-                    UiPathErrorCategory.USER,
-                )
 
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
