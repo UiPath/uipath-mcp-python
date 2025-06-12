@@ -375,16 +375,25 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             logger.info(client_info)
 
+            folder_key = os.environ.get("UIPATH_FOLDER_KEY")
+            if not folder_key:
+                raise UiPathMcpRuntimeError(
+                    "REGISTRATION_ERROR",
+                    "No UIPATH_FOLDER_KEY environment variable set.",
+                    UiPathErrorCategory.USER,
+                )
+
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
                 "POST",
                 f"mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
+                headers={"X-UIPATH-FolderKey": folder_key},
             )
             logger.info("Registered MCP Server type successfully")
         except Exception as e:
             logger.error(f"Error during registration: {e}")
-            if (e.status_code == 400):
+            if e.status_code == 400:
                 logger.error(f"Error details: {e.response.text}")
 
             raise UiPathMcpRuntimeError(
