@@ -227,7 +227,7 @@ class SessionServer:
     ) -> None:
         response = await self._uipath.api_client.request_async(
             "POST",
-            f"mcp_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}&requestId={request_id}",
+            f"agenthub_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}&requestId={request_id}",
             json=message.model_dump(),
         )
         if response.status_code == 202:
@@ -238,7 +238,7 @@ class SessionServer:
     async def _get_messages_internal(self, request_id: str) -> None:
         response = await self._uipath.api_client.request_async(
             "GET",
-            f"mcp_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}&requestId={request_id}",
+            f"agenthub_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}&requestId={request_id}",
         )
         if response.status_code == 200:
             self._last_request_id = request_id
