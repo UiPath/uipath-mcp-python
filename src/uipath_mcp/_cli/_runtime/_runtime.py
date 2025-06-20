@@ -72,7 +72,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             )  # type: ignore
 
             # Set up SignalR client
-            signalr_url = f"{os.environ.get('UIPATH_URL')}/mcp_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
+            signalr_url = f"{os.environ.get('UIPATH_URL')}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
 
             with tracer.start_as_current_span(self._server.name) as root_span:
                 root_span.set_attribute("runtime_id", self._runtime_id)
@@ -389,7 +389,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
                 "POST",
-                f"mcp_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
+                f"agenthub_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
                 headers={"X-UIPATH-FolderKey": folder_key},
             )
@@ -414,7 +414,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"mcp_/mcp/{self._server.name}/out/message?sessionId={session_id}",
+                f"agenthub_/mcp/{self._server.name}/out/message?sessionId={session_id}",
                 json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
@@ -480,7 +480,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"mcp_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}",
+                f"agenthub_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}",
             )
             if response.status_code == 202:
                 logger.info(
