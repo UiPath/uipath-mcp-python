@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Any, Callable, overload
 import uuid
 
 from uipath._cli.middlewares import MiddlewareResult
@@ -7,8 +8,14 @@ from uipath._cli.middlewares import MiddlewareResult
 from ._utils._config import McpConfig
 
 
-async def mcp_init_middleware_async(entrypoint: str) -> MiddlewareResult:
+async def mcp_init_middleware_async(
+    entrypoint: str,
+    options: dict[str, Any] | None = None,
+    write_config: Callable[[Any], str] | None = None,
+) -> MiddlewareResult:
     """Middleware to check for mcp.json and create uipath.json with schemas"""
+    options = options or {}
+
     config = McpConfig()
     if not config.exists:
         return MiddlewareResult(
@@ -39,10 +46,13 @@ async def mcp_init_middleware_async(entrypoint: str) -> MiddlewareResult:
             "entryPoints": entrypoints
         }
 
-        config_path = "uipath.json"
-
-        with open(config_path, "w") as f:
-            json.dump(uipath_data, f, indent=4)
+        if write_config:
+            config_path = write_config(uipath_data)
+        else:
+            # Save the uipath.json file
+            config_path = "uipath.json"
+            with open(config_path, "w") as f:
+                json.dump(uipath_data, f, indent=2)
 
         return MiddlewareResult(
             should_continue=False,
@@ -56,7 +66,23 @@ async def mcp_init_middleware_async(entrypoint: str) -> MiddlewareResult:
             should_include_stacktrace=True,
         )
 
+@overload
+def mcp_init_middleware(entrypoint: str) -> MiddlewareResult: ...
 
-def mcp_init_middleware(entrypoint: str) -> MiddlewareResult:
+
+@overload
+def mcp_init_middleware(
+    entrypoint: str,
+    options: dict[str, Any],
+    write_config: Callable[[Any], str],
+) -> MiddlewareResult: ...
+
+
+
+def mcp_init_middleware(
+    entrypoint: str,
+    options: dict[str, Any] | None = None,
+    write_config: Callable[[Any], str] | None = None,
+) -> MiddlewareResult:
     """Middleware to check for mcp.json and create uipath.json with schemas"""
-    return asyncio.run(mcp_init_middleware_async(entrypoint))
+    return asyncio.run(mcp_init_middleware_async(entrypoint, options, write_config))
