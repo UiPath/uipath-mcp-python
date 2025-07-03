@@ -20,15 +20,15 @@ class UiPathServerType(Enum):
 
     Attributes:
         UiPath (0): Standard UiPath server for Processes, Agents, and Activities
-        External (1): External server types like npx, uvx
-        Local (2): Local MCP server (PackageType.MCPServer)
-        Hosted (3): Tunnel to externally hosted server
+        Command (1): Command server types like npx, uvx
+        Coded (2): Coded MCP server (PackageType.MCPServer)
+        SelfHosted (3): Tunnel to externally hosted server
     """
 
     UiPath = 0  # type: int # Processes, Agents, Activities
-    External = 1  # type: int # npx, uvx
-    Local = 2  # type: int # PackageType.MCPServer
-    Hosted = 3  # type: int # tunnel to externally hosted server
+    Command = 1  # type: int # npx, uvx
+    Coded = 2  # type: int # PackageType.MCPServer
+    SelfHosted = 3  # type: int # tunnel to externally hosted server
 
     @classmethod
     def from_string(cls, name: str) -> "UiPathServerType":
@@ -43,8 +43,8 @@ class UiPathServerType(Enum):
         """Get description for a server type."""
         descriptions = {
             cls.UiPath: "Standard UiPath server for Processes, Agents, and Activities",
-            cls.External: "External server types like npx, uvx",
-            cls.Local: "Local MCP server (PackageType.MCPServer)",
-            cls.Hosted: "Tunnel to externally hosted server",
+            cls.Command: "Command server types like npx, uvx",
+            cls.Coded: "Coded MCP server (PackageType.MCPServer)",
+            cls.SelfHosted: "Tunnel to externally hosted server",
         }
         return descriptions.get(server_type, "Unknown server type")
