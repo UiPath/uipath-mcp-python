@@ -143,15 +143,16 @@ class SessionServer:
                         # Cancel the consumer when we exit the loop
                         consumer_task.cancel()
                         try:
-                            await consumer_task
-                        except asyncio.CancelledError:
+                            await asyncio.wait_for(consumer_task, timeout=2.0)
+                        except (asyncio.CancelledError, asyncio.TimeoutError):
                             pass
 
-            except Exception as e:
-                logger.error(
-                    f"Error in server process for session {self._session_id}: {e}",
-                    exc_info=True,
-                )
+            except* Exception as eg:
+                for e in eg.exceptions:
+                    logger.error(
+                        f"Unexpected error for session {self._session_id}: {e}",
+                        exc_info=True,
+                    )
             finally:
                 stderr_temp.seek(0)
                 self._server_stderr_output = stderr_temp.read().decode(
