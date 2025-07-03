@@ -3,10 +3,10 @@ import logging
 import os
 import sys
 import tempfile
-import traceback
 import uuid
 from typing import Any, Dict, Optional
 
+from httpx import HTTPStatusError
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.types import JSONRPCResponse
 from opentelemetry import trace
@@ -329,35 +329,11 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             # We'll handle this after exiting the context managers
                         # We don't continue with registration here - we'll do it after the context managers
 
-        except BaseException as e:
-            # In Python 3.10, ExceptionGroup is in the 'exceptiongroup' module
-            # and asyncio.TaskGroup wraps exceptions in ExceptionGroup
-            if hasattr(e, "__context__") and e.__context__ is not None:
-                logger.error("Sub-exception details:")
+        except* Exception as eg:
+            for e in eg.exceptions:
                 logger.error(
-                    "".join(
-                        traceback.format_exception(
-                            type(e.__context__),
-                            e.__context__,
-                            e.__context__.__traceback__,
-                        )
-                    )
-                )
-            elif hasattr(e, "exceptions"):  # For ExceptionGroup
-                for i, sub_exc in enumerate(e.exceptions):
-                    logger.error(f"Sub-exception {i + 1}:")
-                    logger.error(
-                        "".join(
-                            traceback.format_exception(
-                                type(sub_exc), sub_exc, sub_exc.__traceback__
-                            )
-                        )
-                    )
-            else:
-                # Log the full traceback of the exception itself
-                logger.error("Full traceback:")
-                logger.error(
-                    "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    f"Unexpected error: {e}",
+                    exc_info=True,
                 )
 
         # Now that we're outside the context managers, check if initialization succeeded
@@ -395,8 +371,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 }
                 client_info["tools"].append(tool_info)
 
-            logger.info(client_info)
-
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
                 "POST",
@@ -407,8 +381,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             logger.info("Registered MCP Server type successfully")
         except Exception as e:
             logger.error(f"Error during registration: {e}")
-            if e.status_code == 400:
-                logger.error(f"Error details: {e.response.text}")
+            if isinstance(e, HTTPStatusError):
+                logger.error(
+                    f"HTTP error details: {e.response.text} status code: {e.response.status_code}"
+                )
 
             raise UiPathMcpRuntimeError(
                 "REGISTRATION_ERROR",
