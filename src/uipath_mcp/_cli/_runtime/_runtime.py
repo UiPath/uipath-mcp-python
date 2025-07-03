@@ -286,8 +286,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         server_stderr_output = ""
         env_vars = self._server.env
 
-        # if server is Local, include environment variables
-        if self.server_type is UiPathServerType.Local:
+        # if server is Coded, include environment variables
+        if self.server_type is UiPathServerType.Coded:
             for name, value in os.environ.items():
                 # config env variables should have precedence over system ones
                 if name not in env_vars:
@@ -553,12 +553,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             UiPathServerType: The appropriate server type enum value based on the runtime configuration.
         """
         if self.packaged:
-            # If it's a packaged runtime (has a process_key), it's a Local server
+            # If it's a packaged runtime (has a process_key), it's a Coded server
             # Packaged runtimes are also sandboxed
-            return UiPathServerType.Local
+            return UiPathServerType.Coded
         elif self.sandboxed:
-            # If it's sandboxed but not packaged, it's an External server
-            return UiPathServerType.External
+            # If it's sandboxed but not packaged, it's a Command server
+            return UiPathServerType.Command
         else:
-            # If it's neither packaged nor sandboxed, it's a Hosted server
-            return UiPathServerType.Hosted
+            # If it's neither packaged nor sandboxed, it's a SelfHosted server
+            return UiPathServerType.SelfHosted
