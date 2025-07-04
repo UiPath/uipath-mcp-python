@@ -119,26 +119,42 @@ class SessionServer:
                     try:
                         while True:
                             # Get message from local server
-                            session_message = await self._read_stream.receive()
-                            message = session_message.message
-                            # For responses, determine which request_id to use
-                            if self._is_response(message):
-                                message_id = self._get_message_id(message)
-                                if message_id and message_id in self._active_requests:
-                                    # Use the stored request_id for this response
-                                    request_id = self._active_requests[message_id]
-                                    # Send with the matched request_id
-                                    await self._send_message(message, request_id)
-                                    # Clean up the mapping after use
-                                    del self._active_requests[message_id]
+                            session_message = None
+                            try:
+                                session_message = await self._read_stream.receive()
+                                message = session_message.message
+                                # For responses, determine which request_id to use
+                                if self._is_response(message):
+                                    message_id = self._get_message_id(message)
+                                    if message_id and message_id in self._active_requests:
+                                        # Use the stored request_id for this response
+                                        request_id = self._active_requests[message_id]
+                                        # Send with the matched request_id
+                                        await self._send_message(message, request_id)
+                                        # Clean up the mapping after use
+                                        del self._active_requests[message_id]
+                                    else:
+                                        # If no mapping found, use the last known request_id
+                                        await self._send_message(
+                                            message, self._last_request_id
+                                        )
                                 else:
-                                    # If no mapping found, use the last known request_id
-                                    await self._send_message(
-                                        message, self._last_request_id
-                                    )
-                            else:
-                                # For non-responses, use the last known request_id
-                                await self._send_message(message, self._last_request_id)
+                                    # For non-responses, use the last known request_id
+                                    await self._send_message(message, self._last_request_id)
+                            except Exception as e:
+                                if session_message:
+                                    logger.info(session_message)
+                                logger.error(
+                                    f"Error processing message for session {self._session_id}: {e}",
+                                    exc_info=True,
+                                )
+                                await self._send_message(
+                                    JSONRPCError(
+                                        code=-32000,
+                                        message=f"Error processing message: {session_message} {e} ",
+                                    ),
+                                    self._last_request_id,
+                                )
                     finally:
                         # Cancel the consumer when we exit the loop
                         consumer_task.cancel()
@@ -158,6 +174,7 @@ class SessionServer:
                 self._server_stderr_output = stderr_temp.read().decode(
                     "utf-8", errors="replace"
                 )
+                logger.error(self._server_stderr_output)
                 # The context managers will handle cleanup of resources
 
     def _run_server_callback(self, task):

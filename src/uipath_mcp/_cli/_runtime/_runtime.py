@@ -65,11 +65,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if self._server is None:
                 return None
 
-            self.trace_provider = TracerProvider()
-            trace.set_tracer_provider(self.trace_provider)
-            self.trace_provider.add_span_processor(
-                BatchSpanProcessor(LlmOpsHttpExporter())
-            )  # type: ignore
+            if self.context.job_id:
+                self.trace_provider = TracerProvider()
+                trace.set_tracer_provider(self.trace_provider)
+                self.trace_provider.add_span_processor(
+                    BatchSpanProcessor(LlmOpsHttpExporter())
+                )  # type: ignore
 
             # Set up SignalR client
             signalr_url = f"{os.environ.get('UIPATH_URL')}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
