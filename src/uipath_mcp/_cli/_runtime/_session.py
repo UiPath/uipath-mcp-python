@@ -5,7 +5,13 @@ from typing import Dict, Optional
 
 from mcp import StdioServerParameters, stdio_client
 from mcp.shared.message import SessionMessage
-from mcp.types import JSONRPCError, JSONRPCMessage, JSONRPCRequest, JSONRPCResponse
+from mcp.types import (
+    ErrorData,
+    JSONRPCError,
+    JSONRPCMessage,
+    JSONRPCRequest,
+    JSONRPCResponse,
+)
 from opentelemetry import trace
 from uipath import UiPath
 
@@ -31,7 +37,8 @@ class SessionServer:
         self._run_task = None
         self._message_queue = asyncio.Queue()
         self._active_requests: Dict[str, str] = {}
-        self._last_request_id: None
+        self._last_request_id = None
+        self._last_message_id = None
         self._uipath = UiPath()
         self._mcp_tracer = McpTracer(tracer, logger)
         self._server_stderr_output: Optional[str] = None
@@ -122,11 +129,17 @@ class SessionServer:
                             session_message = None
                             try:
                                 session_message = await self._read_stream.receive()
+                                if isinstance(session_message, Exception):
+                                    logger.error(f"Received error: {session_message}")
+                                    continue
                                 message = session_message.message
                                 # For responses, determine which request_id to use
                                 if self._is_response(message):
                                     message_id = self._get_message_id(message)
-                                    if message_id and message_id in self._active_requests:
+                                    if (
+                                        message_id
+                                        and message_id in self._active_requests
+                                    ):
                                         # Use the stored request_id for this response
                                         request_id = self._active_requests[message_id]
                                         # Send with the matched request_id
@@ -140,7 +153,9 @@ class SessionServer:
                                         )
                                 else:
                                     # For non-responses, use the last known request_id
-                                    await self._send_message(message, self._last_request_id)
+                                    await self._send_message(
+                                        message, self._last_request_id
+                                    )
                             except Exception as e:
                                 if session_message:
                                     logger.info(session_message)
@@ -149,12 +164,20 @@ class SessionServer:
                                     exc_info=True,
                                 )
                                 await self._send_message(
-                                    JSONRPCError(
-                                        code=-32000,
-                                        message=f"Error processing message: {session_message} {e} ",
+                                    JSONRPCMessage(
+                                        root=JSONRPCError(
+                                            jsonrpc="2.0",
+                                            # Use the last known message id for error reporting
+                                            id=self._last_message_id,
+                                            error=ErrorData(
+                                                code=-32000,
+                                                message=f"Error processing message: {e}",
+                                            ),
+                                        )
                                     ),
                                     self._last_request_id,
                                 )
+                                continue
                     finally:
                         # Cancel the consumer when we exit the loop
                         consumer_task.cancel()
@@ -267,6 +290,7 @@ class SessionServer:
                 if self._is_request(json_message):
                     message_id = self._get_message_id(json_message)
                     if message_id:
+                        self._last_message_id = message_id
                         self._active_requests[message_id] = request_id
                 with self._mcp_tracer.create_span_for_message(
                     json_message,
