@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -368,6 +369,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     "Name": tool.name,
                     "ProcessType": "Tool",
                     "Description": tool.description,
+                    "InputSchema": json.dumps(tool.inputSchema)
+                    if tool.inputSchema
+                    else "{}",
                 }
                 client_info["tools"].append(tool_info)
 
