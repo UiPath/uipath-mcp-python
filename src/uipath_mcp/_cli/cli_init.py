@@ -1,7 +1,7 @@
 import asyncio
 import json
-from typing import Any, Callable, overload
 import uuid
+from typing import Any, Callable, overload
 
 from uipath._cli.middlewares import MiddlewareResult
 
@@ -28,7 +28,6 @@ async def mcp_init_middleware_async(
         entrypoints = []
 
         for server in config.get_servers():
-
             if entrypoint and server.name != entrypoint:
                 continue
 
@@ -37,14 +36,12 @@ async def mcp_init_middleware_async(
                 "uniqueId": str(uuid.uuid4()),
                 "type": "mcpserver",
                 "input": {},
-                "output": {}
+                "output": {},
             }
 
             entrypoints.append(entrypoint_data)
 
-        uipath_data = {
-            "entryPoints": entrypoints
-        }
+        uipath_data = {"entryPoints": entrypoints}
 
         if write_config:
             config_path = write_config(uipath_data)
@@ -66,6 +63,7 @@ async def mcp_init_middleware_async(
             should_include_stacktrace=True,
         )
 
+
 @overload
 def mcp_init_middleware(entrypoint: str) -> MiddlewareResult: ...
 
@@ -76,7 +74,6 @@ def mcp_init_middleware(
     options: dict[str, Any],
     write_config: Callable[[Any], str],
 ) -> MiddlewareResult: ...
-
 
 
 def mcp_init_middleware(
