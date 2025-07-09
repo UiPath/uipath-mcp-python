@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "longrunning-server": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["server.py"]
+    }
+  }
+}
