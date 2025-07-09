@@ -1,0 +1,11 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "longrunning-server-ground",
+            "uniqueId": "3260fdf2-aea6-4c81-af70-bf7182456c4c",
+            "type": "mcpserver",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
