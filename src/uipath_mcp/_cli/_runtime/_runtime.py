@@ -1,24 +1,27 @@
 import asyncio
+import io
 import json
 import logging
 import os
 import sys
 import tempfile
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from httpx import HTTPStatusError
 from mcp import ClientSession, StdioServerParameters, stdio_client
-from mcp.types import JSONRPCResponse
+from mcp.types import JSONRPCResponse, ListToolsResult
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from pysignalr.client import CompletionMessage, SignalRClient
+from pysignalr.client import SignalRClient
+from pysignalr.messages import CompletionMessage
 from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
     UiPathRuntimeResult,
+    UiPathTraceContext,
 )
 from uipath.tracing import LlmOpsHttpExporter
 
@@ -47,8 +50,75 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._session_servers: Dict[str, SessionServer] = {}
         self._session_output: Optional[str] = None
         self._cancel_event = asyncio.Event()
-        self._keep_alive_task: Optional[asyncio.Task] = None
+        self._keep_alive_task: Optional[asyncio.Task[None]] = None
         self._uipath = UiPath()
+        self.trace_provider: Optional[TracerProvider] = None
+
+    async def validate(self) -> None:
+        """Validate runtime inputs and load MCP server configuration."""
+        if self.context.config is None:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing configuration",
+                "Configuration is required.",
+                UiPathErrorCategory.SYSTEM,
+            )
+
+        if self.context.entrypoint is None:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing entrypoint",
+                "Entrypoint is required.",
+                UiPathErrorCategory.SYSTEM,
+            )
+
+        self._server = self.context.config.get_server(self.context.entrypoint)
+        if not self._server:
+            raise UiPathMcpRuntimeError(
+                "SERVER_NOT_FOUND",
+                "MCP server not found",
+                f"Server '{self.context.entrypoint}' not found in configuration",
+                UiPathErrorCategory.DEPLOYMENT,
+            )
+
+    def _validate_auth(self) -> None:
+        """Validate authentication-related configuration.
+
+        Raises:
+            UiPathMcpRuntimeError: If any required authentication values are missing.
+        """
+        uipath_url = os.environ.get("UIPATH_URL")
+        if not uipath_url:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing UIPATH_URL environment variable",
+                "Please run 'uipath auth'.",
+                UiPathErrorCategory.USER,
+            )
+
+        if not self.context.trace_context:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing trace context",
+                "Trace context is required for SignalR connection.",
+                UiPathErrorCategory.SYSTEM,
+            )
+
+        if not self.context.trace_context.tenant_id:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing tenant ID",
+                "Please run 'uipath auth'.",
+                UiPathErrorCategory.SYSTEM,
+            )
+
+        if not self.context.trace_context.org_id:
+            raise UiPathMcpRuntimeError(
+                "CONFIGURATION_ERROR",
+                "Missing organization ID",
+                "Please run 'uipath auth'.",
+                UiPathErrorCategory.SYSTEM,
+            )
 
     async def execute(self) -> Optional[UiPathRuntimeResult]:
         """
@@ -71,10 +141,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 trace.set_tracer_provider(self.trace_provider)
                 self.trace_provider.add_span_processor(
                     BatchSpanProcessor(LlmOpsHttpExporter())
-                )  # type: ignore
+                )
+
+            # Validate authentication configuration
+            self._validate_auth()
 
             # Set up SignalR client
-            signalr_url = f"{os.environ.get('UIPATH_URL')}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
+            uipath_url = os.environ.get("UIPATH_URL")
+            signalr_url = f"{uipath_url}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
 
             if not self.context.folder_key:
                 folder_path = os.environ.get("UIPATH_FOLDER_PATH")
@@ -98,17 +172,22 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             with tracer.start_as_current_span(self.slug) as root_span:
                 root_span.set_attribute("runtime_id", self._runtime_id)
-                root_span.set_attribute("command", self._server.command)
-                root_span.set_attribute("args", self._server.args)
+                root_span.set_attribute("command", str(self._server.command))
+                root_span.set_attribute("args", json.dumps(self._server.args))
                 root_span.set_attribute("span_type", "MCP Server")
+                trace_context = cast(UiPathTraceContext, self.context.trace_context)
+                tenant_id = str(trace_context.tenant_id)
+                org_id = str(trace_context.org_id)
+
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
-                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
-                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+                        "X-UiPath-Internal-TenantId": tenant_id,
+                        "X-UiPath-Internal-AccountId": org_id,
                         "X-UIPATH-FolderKey": self.context.folder_key,
                     },
                 )
+
                 self._signalr_client.on("MessageReceived", self._handle_signalr_message)
                 self._signalr_client.on(
                     "SessionClosed", self._handle_signalr_session_closed
@@ -166,19 +245,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             ) from e
         finally:
             await self.cleanup()
-            if hasattr(self, "trace_provider") and self.trace_provider:
+            if self.trace_provider:
                 self.trace_provider.shutdown()
-
-    async def validate(self) -> None:
-        """Validate runtime inputs and load MCP server configuration."""
-        self._server = self.context.config.get_server(self.context.entrypoint)
-        if not self._server:
-            raise UiPathMcpRuntimeError(
-                "SERVER_NOT_FOUND",
-                "MCP server not found",
-                f"Server '{self.context.entrypoint}' not found in configuration",
-                UiPathErrorCategory.DEPLOYMENT,
-            )
 
     async def cleanup(self) -> None:
         """Clean up all resources."""
@@ -210,7 +278,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         if sys.platform == "win32":
             await asyncio.sleep(0.5)
 
-    async def _handle_signalr_session_closed(self, args: list) -> None:
+    async def _handle_signalr_session_closed(self, args: list[Any]) -> None:
         """
         Handle session closed by server.
         """
@@ -240,7 +308,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         except Exception as e:
             logger.error(f"Error terminating session {session_id}: {str(e)}")
 
-    async def _handle_signalr_message(self, args: list) -> None:
+    async def _handle_signalr_message(self, args: list[Any]) -> None:
         """
         Handle incoming SignalR messages.
         """
@@ -254,10 +322,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         logger.info(f"Received websocket notification... {session_id}")
 
         try:
+            server = cast(McpServer, self._server)
+
             # Check if we have a session server for this session_id
             if session_id not in self._session_servers:
                 # Create and start a new session server
-                session_server = SessionServer(self._server, self.slug, session_id)
+                session_server = SessionServer(server, self.slug, session_id)
                 try:
                     await session_server.start()
                 except Exception as e:
@@ -293,11 +363,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
+        server = cast(McpServer, self._server)
 
         initialization_successful = False
-        tools_result = None
+        tools_result: Optional[ListToolsResult] = None
         server_stderr_output = ""
-        env_vars = self._server.env
+        env_vars = dict(server.env)
 
         # if server is Coded, include environment variables
         if self.server_type is UiPathServerType.Coded:
@@ -309,14 +380,15 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             # Create a temporary session to get tools
             server_params = StdioServerParameters(
-                command=self._server.command,
-                args=self._server.args,
+                command=server.command,
+                args=server.args,
                 env=env_vars,
             )
 
             # Start a temporary stdio client to get tools
             # Use a temporary file to capture stderr
-            with tempfile.TemporaryFile(mode="w+b") as stderr_temp:
+            with tempfile.TemporaryFile(mode="w+b") as stderr_temp_binary:
+                stderr_temp = io.TextIOWrapper(stderr_temp_binary, encoding="utf-8")
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
                     write,
@@ -336,11 +408,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             logger.error("Initialization timed out")
                             # Capture stderr output here, after the timeout
                             stderr_temp.seek(0)
-                            server_stderr_output = stderr_temp.read().decode(
-                                "utf-8", errors="replace"
-                            )
-                            # We'll handle this after exiting the context managers
-                        # We don't continue with registration here - we'll do it after the context managers
+                            server_stderr_output = stderr_temp.read()
 
         except* Exception as eg:
             for e in eg.exceptions:
@@ -366,15 +434,24 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         # Now continue with registration
         logger.info("Registering server runtime ...")
         try:
+            if not tools_result:
+                raise UiPathMcpRuntimeError(
+                    "INITIALIZATION_ERROR",
+                    "Server initialization failed",
+                    "Failed to get tools list from server",
+                    UiPathErrorCategory.DEPLOYMENT,
+                )
+
+            tools_list: List[Dict[str, str | None]] = []
             client_info = {
                 "server": {
-                    "Id": self.context.server_id,
                     "Name": self.slug,
                     "Slug": self.slug,
+                    "Id": self.context.server_id,
                     "Version": "1.0.0",
                     "Type": self.server_type.value,
                 },
-                "tools": [],
+                "tools": tools_list,
             }
 
             for tool in tools_result.tools:
@@ -386,7 +463,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     if tool.inputSchema
                     else "{}",
                 }
-                client_info["tools"].append(tool_info)
+                tools_list.append(tool_info)
 
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
@@ -418,14 +495,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",
+                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",  # type: ignore
                 json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
                     result={
                         "protocolVersion": "initialize-failure",
                         "capabilities": {},
-                        "serverInfo": {"name": self.slug, "version": "1.0"},
+                        "serverInfo": {"name": self.slug, "version": "1.0"},  # type: ignore
                     },
                 ).model_dump(),
             )
@@ -475,7 +552,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         await self._signalr_client.send(
                             method="OnKeepAlive",
                             arguments=[],
-                            on_invocation=on_keep_alive_response,
+                            on_invocation=on_keep_alive_response,  # type: ignore
                         )
                 except Exception as e:
                     if not self._cancel_event.is_set():
@@ -497,7 +574,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
+                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",  # type: ignore
             )
             if response.status_code == 202:
                 logger.info(
@@ -530,7 +607,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Returns:
             bool: True if this is a packaged runtime (has a process), False otherwise.
         """
-        process_key = self.context.trace_context.process_key
+        process_key = None
+        if self.context.trace_context is not None:
+            process_key = self.context.trace_context.process_key
 
         return (
             process_key is not None

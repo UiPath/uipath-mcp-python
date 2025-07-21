@@ -53,10 +53,10 @@ class McpTracer:
                 span.set_attribute("type", "response")
                 span.set_attribute("span_type", "MCP response")
                 span.set_attribute("id", str(root_value.id))
-                #if isinstance(root_value.result, dict):
-                    #parent_span.set_attribute("output", json.dumps(root_value.result))
+                # if isinstance(root_value.result, dict):
+                # parent_span.set_attribute("output", json.dumps(root_value.result))
                 self._add_response_attributes(span, root_value)
-            else:  # JSONRPCError
+            elif isinstance(root_value, types.JSONRPCError):  # JSONRPCError
                 span = self._tracer.start_span("error", context=span_context)
                 span.set_attribute("type", "error")
                 span.set_attribute("span_type", "MCP error")
@@ -64,7 +64,6 @@ class McpTracer:
                 span.set_attribute("error_code", root_value.error.code)
                 span.set_attribute("error", root_value.error.message)
                 span.set_status(StatusCode.ERROR)
-
 
             # Remove the request from active tracking
             self._active_request_spans.pop(request_id, None)
@@ -131,9 +130,7 @@ class McpTracer:
                 if "arguments" in request.params and isinstance(
                     request.params["arguments"], dict
                 ):
-                    span.set_attribute(
-                        "input", json.dumps(request.params["arguments"])
-                    )
+                    span.set_attribute("input", json.dumps(request.params["arguments"]))
 
             # Handle specific tracing for other method types
             elif request.method == "resources/read" and isinstance(

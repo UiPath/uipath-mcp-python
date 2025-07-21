@@ -1,14 +1,15 @@
 import os
 import platform
 import subprocess
+from typing import Dict, Union
 
 
 def diagnose_binary(binary_path):
     """Diagnose why a binary file can't be executed."""
-    results = {}
+    results: Dict[str, Union[bool, str]] = {}
 
     # Check if file exists
-    results["exists"] = os.path.exists(binary_path)
+    results["exists"] = bool(os.path.exists(binary_path))
     if not results["exists"]:
         return f"Error: {binary_path} does not exist"
 
@@ -60,23 +61,21 @@ def diagnose_binary(binary_path):
         print(f"Binary architecture: {results['binary_arch']}")
 
     # Provide potential solution
-    if "ELF" in results.get("file_type", "") and results["system_os"] == "Linux":
-        if (
-            "64-bit" in results["file_type"]
-            and "x86-64" in results["file_type"]
-            and results["system_arch"] != "x86_64"
-        ):
+    file_type = str(results.get("file_type", ""))
+    system_os = str(results["system_os"])
+    system_arch = str(results["system_arch"])
+    binary_arch = str(results.get("binary_arch", ""))
+
+    if "ELF" in file_type and system_os == "Linux":
+        if "64-bit" in file_type and "x86-64" in file_type and system_arch != "x86_64":
             return (
                 "Error: Binary was compiled for x86_64 architecture but your system is "
-                + results["system_arch"]
+                + system_arch
             )
-        elif (
-            "ARM" in results.get("binary_arch", "")
-            and "arm" not in results["system_arch"].lower()
-        ):
+        elif "ARM" in binary_arch and "arm" not in system_arch.lower():
             return (
                 "Error: Binary was compiled for ARM architecture but your system is "
-                + results["system_arch"]
+                + system_arch
             )
 
     return "Binary format may be incompatible with your system. You need a version compiled specifically for your architecture and operating system."

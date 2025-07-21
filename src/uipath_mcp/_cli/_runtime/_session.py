@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 import tempfile
 from typing import Dict, Optional
@@ -35,11 +36,11 @@ class SessionServer:
         self._read_stream = None
         self._write_stream = None
         self._mcp_session = None
-        self._run_task = None
-        self._message_queue = asyncio.Queue()
+        self._run_task: Optional[asyncio.Task[None]] = None
+        self._message_queue: asyncio.Queue[JSONRPCMessage] = asyncio.Queue()
         self._active_requests: Dict[str, str] = {}
-        self._last_request_id = None
-        self._last_message_id = None
+        self._last_request_id: Optional[str] = None
+        self._last_message_id: Optional[str] = None
         self._uipath = UiPath()
         self._mcp_tracer = McpTracer(tracer, logger)
         self._server_stderr_output: Optional[str] = None
@@ -112,7 +113,8 @@ class SessionServer:
         """Run the local MCP server process."""
         logger.info(f"Starting local MCP Server process for session {self._session_id}")
         self._server_stderr_output = None
-        with tempfile.TemporaryFile(mode="w+b") as stderr_temp:
+        with tempfile.TemporaryFile(mode="w+b") as stderr_temp_binary:
+            stderr_temp = io.TextIOWrapper(stderr_temp_binary, encoding="utf-8")
             try:
                 async with stdio_client(server_params, errlog=stderr_temp) as (
                     read,
@@ -129,6 +131,10 @@ class SessionServer:
                             # Get message from local server
                             session_message = None
                             try:
+                                if self._read_stream is None:
+                                    logger.error("Read stream is not initialized")
+                                    continue
+
                                 session_message = await self._read_stream.receive()
                                 if isinstance(session_message, Exception):
                                     logger.error(f"Received error: {session_message}")
@@ -149,14 +155,16 @@ class SessionServer:
                                         del self._active_requests[message_id]
                                     else:
                                         # If no mapping found, use the last known request_id
+                                        if self._last_request_id is not None:
+                                            await self._send_message(
+                                                message, self._last_request_id
+                                            )
+                                else:
+                                    # For non-responses, use the last known request_id
+                                    if self._last_request_id is not None:
                                         await self._send_message(
                                             message, self._last_request_id
                                         )
-                                else:
-                                    # For non-responses, use the last known request_id
-                                    await self._send_message(
-                                        message, self._last_request_id
-                                    )
                             except Exception as e:
                                 if session_message:
                                     logger.info(session_message)
@@ -164,20 +172,21 @@ class SessionServer:
                                     f"Error processing message for session {self._session_id}: {e}",
                                     exc_info=True,
                                 )
-                                await self._send_message(
-                                    JSONRPCMessage(
-                                        root=JSONRPCError(
-                                            jsonrpc="2.0",
-                                            # Use the last known message id for error reporting
-                                            id=self._last_message_id,
-                                            error=ErrorData(
-                                                code=-32000,
-                                                message=f"Error processing message: {e}",
-                                            ),
-                                        )
-                                    ),
-                                    self._last_request_id,
-                                )
+                                if self._last_request_id is not None:
+                                    await self._send_message(
+                                        JSONRPCMessage(
+                                            root=JSONRPCError(
+                                                jsonrpc="2.0",
+                                                # Use the last known message id for error reporting
+                                                id=self._last_message_id,
+                                                error=ErrorData(
+                                                    code=-32000,
+                                                    message=f"Error processing message: {e}",
+                                                ),
+                                            )
+                                        ),
+                                        self._last_request_id,
+                                    )
                                 continue
                     finally:
                         # Cancel the consumer when we exit the loop
@@ -188,18 +197,15 @@ class SessionServer:
                             pass
 
             except* Exception as eg:
-                for e in eg.exceptions:
+                for exception in eg.exceptions:
                     logger.error(
-                        f"Unexpected error for session {self._session_id}: {e}",
+                        f"Unexpected error for session {self._session_id}: {exception}",
                         exc_info=True,
                     )
             finally:
                 stderr_temp.seek(0)
-                self._server_stderr_output = stderr_temp.read().decode(
-                    "utf-8", errors="replace"
-                )
+                self._server_stderr_output = stderr_temp.read()
                 logger.error(self._server_stderr_output)
-                # The context managers will handle cleanup of resources
 
     def _run_server_callback(self, task):
         """Handle task completion."""

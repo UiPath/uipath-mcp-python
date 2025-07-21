@@ -53,10 +53,10 @@ class UiPathServerType(Enum):
         SelfHosted (3): Tunnel to externally hosted server
     """
 
-    UiPath = 0  # type: int # Processes, Agents, Activities
-    Command = 1  # type: int # npx, uvx
-    Coded = 2  # type: int # PackageType.MCPServer
-    SelfHosted = 3  # type: int # tunnel to externally hosted server
+    UiPath = 0  # Processes, Agents, Activities
+    Command = 1  # npx, uvx
+    Coded = 2  # PackageType.MCPServer
+    SelfHosted = 3  # tunnel to externally hosted server
 
     @classmethod
     def from_string(cls, name: str) -> "UiPathServerType":
