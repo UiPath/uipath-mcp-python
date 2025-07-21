@@ -28,8 +28,9 @@ RETRY_DELAY = 1
 class SessionServer:
     """Manages a server process for a specific session."""
 
-    def __init__(self, server_config: McpServer, session_id: str):
+    def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
         self._server_config = server_config
+        self._server_slug = server_slug
         self._session_id = session_id
         self._read_stream = None
         self._write_stream = None
@@ -244,7 +245,7 @@ class SessionServer:
             message,
             session_id=self._session_id,
             request_id=request_id,
-            server_name=self._server_config.name,
+            server_name=self._server_slug,
         ) as _:
             for attempt in range(MAX_RETRIES + 1):
                 try:
@@ -268,7 +269,7 @@ class SessionServer:
     ) -> None:
         response = await self._uipath.api_client.request_async(
             "POST",
-            f"agenthub_/mcp/{self._server_config.name}/out/message?sessionId={self._session_id}&requestId={request_id}",
+            f"agenthub_/mcp/{self._server_slug}/out/message?sessionId={self._session_id}&requestId={request_id}",
             json=message.model_dump(),
         )
         if response.status_code == 202:
@@ -279,7 +280,7 @@ class SessionServer:
     async def _get_messages_internal(self, request_id: str) -> None:
         response = await self._uipath.api_client.request_async(
             "GET",
-            f"agenthub_/mcp/{self._server_config.name}/in/messages?sessionId={self._session_id}&requestId={request_id}",
+            f"agenthub_/mcp/{self._server_slug}/in/messages?sessionId={self._session_id}&requestId={request_id}",
         )
         if response.status_code == 200:
             self._last_request_id = request_id
@@ -296,7 +297,7 @@ class SessionServer:
                     json_message,
                     session_id=self._session_id,
                     request_id=request_id,
-                    server_name=self._server_config.name,
+                    server_name=self._server_slug,
                 ) as _:
                     await self._message_queue.put(json_message)
         elif 500 <= response.status_code < 600:

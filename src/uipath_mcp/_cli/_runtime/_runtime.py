@@ -96,7 +96,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             logger.info(f"Folder key: {self.context.folder_key}")
 
-            with tracer.start_as_current_span(self._server.name) as root_span:
+            with tracer.start_as_current_span(self.slug) as root_span:
                 root_span.set_attribute("runtime_id", self._runtime_id)
                 root_span.set_attribute("command", self._server.command)
                 root_span.set_attribute("args", self._server.args)
@@ -257,7 +257,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Check if we have a session server for this session_id
             if session_id not in self._session_servers:
                 # Create and start a new session server
-                session_server = SessionServer(self._server, session_id)
+                session_server = SessionServer(self._server, self.slug, session_id)
                 try:
                     await session_server.start()
                 except Exception as e:
@@ -368,8 +368,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             client_info = {
                 "server": {
-                    "Name": self._server.name,
-                    "Slug": self._server.name,
+                    "Id": self.context.server_id,
+                    "Name": self.slug,
+                    "Slug": self.slug,
                     "Version": "1.0.0",
                     "Type": self.server_type.value,
                 },
@@ -390,7 +391,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Register with UiPath MCP Server
             await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
+                f"agenthub_/mcp/{self.slug}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
                 headers={"X-UIPATH-FolderKey": self.context.folder_key},
             )
@@ -417,14 +418,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self._server.name}/out/message?sessionId={session_id}",
+                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",
                 json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
                     result={
                         "protocolVersion": "initialize-failure",
                         "capabilities": {},
-                        "serverInfo": {"name": self._server.name, "version": "1.0"},
+                        "serverInfo": {"name": self.slug, "version": "1.0"},
                     },
                 ).model_dump(),
             )
@@ -496,7 +497,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self._server.name}/runtime/abort?runtimeId={self._runtime_id}",
+                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
             )
             if response.status_code == 202:
                 logger.info(
@@ -535,6 +536,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             process_key is not None
             and process_key != "00000000-0000-0000-0000-000000000000"
         )
+
+    @property
+    def slug(self) -> str:
+        return self.context.server_slug or self._server.name
 
     @property
     def server_type(self) -> UiPathServerType:
