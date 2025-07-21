@@ -5,10 +5,15 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class McpServer:
     """Model representing an MCP server configuration."""
 
-    def __init__(self, name: str, server_config: Dict[str, Any], ):
+    def __init__(
+        self,
+        name: str,
+        server_config: Dict[str, Any],
+    ):
         self.name = name
         self.type = server_config.get("type")
         self.command = server_config.get("command")
@@ -25,11 +30,7 @@ class McpServer:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the server model back to a dictionary."""
-        return {
-            "type": self.type,
-            "command": self.command,
-            "args": self.args
-        }
+        return {"type": self.type, "command": self.command, "args": self.args}
 
     def __repr__(self) -> str:
         return f"McpServer(name='{self.name}', type='{self.type}', command='{self.command}', args={self.args})"
@@ -57,8 +58,7 @@ class McpConfig:
 
             servers_config = self._raw_config.get("servers", {})
             self._servers = {
-                name: McpServer(name, config)
-                for name, config in servers_config.items()
+                name: McpServer(name, config) for name, config in servers_config.items()
             }
 
         except json.JSONDecodeError as e:

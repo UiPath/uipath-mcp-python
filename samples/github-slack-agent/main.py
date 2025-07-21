@@ -108,7 +108,9 @@ End with:
 _This review was generated automatically._
 """
 
-                        return [{"role": "system", "content": system_message}] + state["messages"]
+                        return [{"role": "system", "content": system_message}] + state[
+                            "messages"
+                        ]
 
                     agent = create_react_agent(
                         model,

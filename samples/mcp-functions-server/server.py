@@ -5,6 +5,7 @@ from mcp.server.fastmcp import FastMCP
 # Initialize the MCP server
 mcp = FastMCP("Code Functions MCP Server")
 
+
 # Functions registry to track dynamically added code functions
 class FunctionRegistry:
     def __init__(self):

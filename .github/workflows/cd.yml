@@ -9,6 +9,9 @@ on:
       - pyproject.toml
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
   build:
     name: Build
     runs-on: ubuntu-latest

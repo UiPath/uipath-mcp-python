@@ -180,9 +180,7 @@ IMPORTANT: Your response should only contain the complete function code as a cle
                 **Example use case:** If the function reads files from disk, your setup function should create a temporary folder and write some files into it. Then, test the function against that folder path.
                 """
 
-                seeder = create_react_agent(
-                    model, tools=tools, prompt=test_case_prompt
-                )
+                seeder = create_react_agent(model, tools=tools, prompt=test_case_prompt)
 
                 test_result = await seeder.ainvoke(state)
 

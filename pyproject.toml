@@ -64,6 +64,9 @@ line-ending = "auto"
 plugins = [
   "pydantic.mypy"
 ]
+exclude = [
+    "samples/.*"
+]
 
 follow_imports = "silent"
 warn_redundant_casts = true
