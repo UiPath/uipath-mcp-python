@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "$server_name": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["server.py"]
+    }
+  }
+}

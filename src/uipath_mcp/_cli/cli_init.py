@@ -2,11 +2,12 @@ import asyncio
 import json
 import uuid
 from typing import Any, Callable, overload
-
+from uipath._cli._utils._console import ConsoleLogger
 from uipath._cli.middlewares import MiddlewareResult
 
 from ._utils._config import McpConfig
 
+console = ConsoleLogger()
 
 async def mcp_init_middleware_async(
     entrypoint: str,
@@ -51,10 +52,8 @@ async def mcp_init_middleware_async(
             with open(config_path, "w") as f:
                 json.dump(uipath_data, f, indent=2)
 
-        return MiddlewareResult(
-            should_continue=False,
-            info_message=f"Configuration file {config_path} created successfully.",
-        )
+        console.success(f"Created '{config_path}' file." )
+        return MiddlewareResult(should_continue=False)
 
     except Exception as e:
         return MiddlewareResult(
