@@ -33,6 +33,23 @@ def mcp_run_middleware(
             context = UiPathMcpRuntimeContext.from_config(
                 env.get("UIPATH_CONFIG_PATH", "uipath.json")
             )
+
+            import json
+            import os
+
+            config_path = env.get("UIPATH_CONFIG_PATH")
+            path = config_path or "uipath.json"
+
+            config2 = {}
+
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    config2 = json.load(f)
+
+            print("-" * 40)
+            print(config2)
+            print("-" * 40)
+
             context.config = config
             context.entrypoint = entrypoint
             context.input = input
