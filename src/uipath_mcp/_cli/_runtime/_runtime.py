@@ -14,7 +14,6 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pysignalr.client import CompletionMessage, SignalRClient
-from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
@@ -26,6 +25,7 @@ from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
+from uipath import UiPath
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -274,13 +274,18 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """Register the MCP server with UiPath."""
 
         folder_key = os.environ.get("UIPATH_FOLDER_KEY")
-        if not folder_key:
+        folder_path = os.environ.get("UIPATH_FOLDER_PATH")
+        if not folder_key and not folder_path:
             raise UiPathMcpRuntimeError(
                 "REGISTRATION_ERROR",
-                "No UIPATH_FOLDER_KEY environment variable set.",
-                "Please set the UIPATH_FOLDER_KEY environment variable.",
+                "No UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable set.",
+                "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
                 UiPathErrorCategory.USER,
             )
+        if not folder_key:
+            uipath = UiPath()
+            folder_key = uipath.folders.retrieve_key(folder_path=folder_path)
+
         logger.info(f"Folder key: {folder_key}")
 
         initialization_successful = False
