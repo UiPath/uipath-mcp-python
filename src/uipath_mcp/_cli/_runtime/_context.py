@@ -10,6 +10,7 @@ class UiPathMcpRuntimeContext(UiPathRuntimeContext):
     """Context information passed throughout the runtime execution."""
 
     config: Optional[McpConfig] = None
+    folder_key: Optional[str] = None
 
 
 class UiPathServerType(Enum):

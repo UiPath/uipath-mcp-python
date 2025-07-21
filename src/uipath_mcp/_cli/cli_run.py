@@ -39,6 +39,7 @@ def mcp_run_middleware(
             context.resume = resume
             context.logs_min_level = env.get("LOG_LEVEL", "INFO")
             context.job_id = env.get("UIPATH_JOB_KEY")
+            context.folder_key = env.get("UIPATH_FOLDER_KEY")
             context.trace_id = env.get("UIPATH_TRACE_ID")
             context.tracing_enabled = env.get("UIPATH_TRACING_ENABLED", True)
             context.trace_context = UiPathTraceContext(

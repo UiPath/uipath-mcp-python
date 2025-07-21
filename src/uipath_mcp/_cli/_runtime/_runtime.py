@@ -14,6 +14,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pysignalr.client import CompletionMessage, SignalRClient
+from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
@@ -25,7 +26,6 @@ from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext, UiPathServerType
 from ._exception import UiPathMcpRuntimeError
 from ._session import SessionServer
-from uipath import UiPath
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -76,6 +76,26 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Set up SignalR client
             signalr_url = f"{os.environ.get('UIPATH_URL')}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
 
+            if not self.context.folder_key:
+                folder_path = os.environ.get("UIPATH_FOLDER_PATH")
+                if not folder_path:
+                    raise UiPathMcpRuntimeError(
+                        "REGISTRATION_ERROR",
+                        "No UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable set.",
+                        "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
+                        UiPathErrorCategory.USER,
+                    )
+                self.context.folder_key = self._uipath.folders.retrieve_key(folder_path=folder_path)
+                if not self.context.folder_key:
+                    raise UiPathMcpRuntimeError(
+                        "REGISTRATION_ERROR",
+                        "Folder NOT FOUND. Invalid UIPATH_FOLDER_PATH environment variable.",
+                        "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
+                        UiPathErrorCategory.USER,
+                    )
+
+            logger.info(f"Folder key: {self.context.folder_key}")
+
             with tracer.start_as_current_span(self._server.name) as root_span:
                 root_span.set_attribute("runtime_id", self._runtime_id)
                 root_span.set_attribute("command", self._server.command)
@@ -86,6 +106,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                     headers={
                         "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
                         "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+                        "X-UIPATH-FolderKey": self.context.folder_key,
                     },
                 )
                 self._signalr_client.on("MessageReceived", self._handle_signalr_message)
@@ -273,21 +294,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
 
-        folder_key = os.environ.get("UIPATH_FOLDER_KEY")
-        folder_path = os.environ.get("UIPATH_FOLDER_PATH")
-        if not folder_key and not folder_path:
-            raise UiPathMcpRuntimeError(
-                "REGISTRATION_ERROR",
-                "No UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable set.",
-                "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
-                UiPathErrorCategory.USER,
-            )
-        if not folder_key:
-            uipath = UiPath()
-            folder_key = uipath.folders.retrieve_key(folder_path=folder_path)
-
-        logger.info(f"Folder key: {folder_key}")
-
         initialization_successful = False
         tools_result = None
         server_stderr_output = ""
@@ -386,7 +392,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 "POST",
                 f"agenthub_/mcp/{self._server.name}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
-                headers={"X-UIPATH-FolderKey": folder_key},
+                headers={"X-UIPATH-FolderKey": self.context.folder_key},
             )
             logger.info("Registered MCP Server type successfully")
         except Exception as e:
