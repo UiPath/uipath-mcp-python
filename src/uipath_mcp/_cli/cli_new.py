@@ -1,12 +1,13 @@
 import os
 import shutil
-from typing import Tuple, Optional, List
+from typing import List, Optional, Tuple
 
 import click
 from uipath._cli._utils._console import ConsoleLogger
 from uipath._cli.middlewares import MiddlewareResult
 
 console = ConsoleLogger()
+
 
 def clean_directory(directory: str) -> None:
     """Clean up Python files in the specified directory.
@@ -20,11 +21,17 @@ def clean_directory(directory: str) -> None:
     for file_name in os.listdir(directory):
         file_path = os.path.join(directory, file_name)
 
-        if os.path.isfile(file_path) and file_name.endswith('.py'):
+        if os.path.isfile(file_path) and file_name.endswith(".py"):
             # Delete the file
             os.remove(file_path)
 
-def write_template_file(target_directory:str, file_path: str, file_name: str, replace_tuple: Optional[List[Tuple[str, str]]] =  None) -> None:
+
+def write_template_file(
+    target_directory: str,
+    file_path: str,
+    file_name: str,
+    replace_tuple: Optional[List[Tuple[str, str]]] = None,
+) -> None:
     """Write a template file to the target directory with optional placeholder replacements.
 
     Args:
@@ -37,9 +44,7 @@ def write_template_file(target_directory:str, file_path: str, file_name: str, re
     This function copies a template file to the target directory and optionally replaces placeholders
     with specified values. It logs a success message after creating the file.
     """
-    template_path = os.path.join(
-        os.path.dirname(__file__), file_path
-    )
+    template_path = os.path.join(os.path.dirname(__file__), file_path)
     target_path = os.path.join(target_directory, file_name)
     if replace_tuple is not None:
         # replace the template placeholders
@@ -67,23 +72,21 @@ def generate_files(target_directory: str, server_name: str):
     - pyproject.toml: Project metadata and dependencies
     """
     write_template_file(
-        target_directory,
-        "_templates/server.py.template",
-        "server.py",
-        None
+        target_directory, "_templates/server.py.template", "server.py", None
     )
     write_template_file(
         target_directory,
         "_templates/mcp.json.template",
         "mcp.json",
-        [("$server_name", server_name)]
+        [("$server_name", server_name)],
     )
     write_template_file(
         target_directory,
         "_templates/pyproject.toml.template",
         "pyproject.toml",
-        [("$project_name", server_name)]
+        [("$project_name", server_name)],
     )
+
 
 def mcp_new_middleware(name: str) -> MiddlewareResult:
     """Create a new MCP server project with template files.
@@ -105,7 +108,9 @@ def mcp_new_middleware(name: str) -> MiddlewareResult:
     directory = os.getcwd()
 
     try:
-        with console.spinner(f"Creating new mcp server '{name}' in current directory ..."):
+        with console.spinner(
+            f"Creating new mcp server '{name}' in current directory ..."
+        ):
             clean_directory(directory)
             generate_files(directory, name)
             init_command = """uipath init"""
@@ -117,11 +122,21 @@ def mcp_new_middleware(name: str) -> MiddlewareResult:
             line = click.style("═" * 60, bold=True)
 
             console.info(line)
-            console.info(click.style(f"""Start '{name}' as a self-hosted MCP server""", fg="magenta", bold=True))
+            console.info(
+                click.style(
+                    f"""Start '{name}' as a self-hosted MCP server""",
+                    fg="magenta",
+                    bold=True,
+                )
+            )
             console.info(line)
 
-            console.hint(f""" 1. Set {click.style("UIPATH_FOLDER_PATH", fg="cyan")} environment variable""")
-            console.hint(f""" 2. Start the server locally: {click.style(run_command, fg="cyan")}""")
+            console.hint(
+                f""" 1. Set {click.style("UIPATH_FOLDER_PATH", fg="cyan")} environment variable"""
+            )
+            console.hint(
+                f""" 2. Start the server locally: {click.style(run_command, fg="cyan")}"""
+            )
         return MiddlewareResult(should_continue=False)
     except Exception as e:
         console.error(f"Error creating demo agent {str(e)}")

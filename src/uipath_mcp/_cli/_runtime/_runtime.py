@@ -52,7 +52,6 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._cancel_event = asyncio.Event()
         self._keep_alive_task: Optional[asyncio.Task[None]] = None
         self._uipath = UiPath()
-        self.trace_provider: Optional[TracerProvider] = None
 
     async def validate(self) -> None:
         """Validate runtime inputs and load MCP server configuration."""
@@ -148,7 +147,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
             # Set up SignalR client
             uipath_url = os.environ.get("UIPATH_URL")
-            signalr_url = f"{uipath_url}/agenthub_/wsstunnel?slug={self._server.name}&runtimeId={self._runtime_id}"
+            signalr_url = f"{uipath_url}/agenthub_/wsstunnel?slug={self.slug}&runtimeId={self._runtime_id}"
 
             if not self.context.folder_key:
                 folder_path = os.environ.get("UIPATH_FOLDER_PATH")
@@ -159,7 +158,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
                         UiPathErrorCategory.USER,
                     )
-                self.context.folder_key = self._uipath.folders.retrieve_key(folder_path=folder_path)
+                self.context.folder_key = self._uipath.folders.retrieve_key(
+                    folder_path=folder_path
+                )
                 if not self.context.folder_key:
                     raise UiPathMcpRuntimeError(
                         "REGISTRATION_ERROR",
@@ -175,15 +176,12 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 root_span.set_attribute("command", str(self._server.command))
                 root_span.set_attribute("args", json.dumps(self._server.args))
                 root_span.set_attribute("span_type", "MCP Server")
-                trace_context = cast(UiPathTraceContext, self.context.trace_context)
-                tenant_id = str(trace_context.tenant_id)
-                org_id = str(trace_context.org_id)
 
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
-                        "X-UiPath-Internal-TenantId": tenant_id,
-                        "X-UiPath-Internal-AccountId": org_id,
+                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
+                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
                         "X-UIPATH-FolderKey": self.context.folder_key,
                     },
                 )
@@ -245,7 +243,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             ) from e
         finally:
             await self.cleanup()
-            if self.trace_provider:
+            if hasattr(self, "trace_provider") and self.trace_provider:
                 self.trace_provider.shutdown()
 
     async def cleanup(self) -> None:
@@ -495,14 +493,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",  # type: ignore
+                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",
                 json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
                     result={
                         "protocolVersion": "initialize-failure",
                         "capabilities": {},
-                        "serverInfo": {"name": self.slug, "version": "1.0"},  # type: ignore
+                        "serverInfo": {"name": self.slug, "version": "1.0"},
                     },
                 ).model_dump(),
             )
@@ -574,7 +572,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             response = await self._uipath.api_client.request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",  # type: ignore
+                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
             )
             if response.status_code == 202:
                 logger.info(
@@ -618,7 +616,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     @property
     def slug(self) -> str:
-        return self.context.server_slug or self._server.name
+        return self.context.server_slug or self._server.name  # type: ignore
 
     @property
     def server_type(self) -> UiPathServerType:

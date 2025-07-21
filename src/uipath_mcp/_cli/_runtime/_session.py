@@ -133,7 +133,7 @@ class SessionServer:
                             try:
                                 if self._read_stream is None:
                                     logger.error("Read stream is not initialized")
-                                    continue
+                                    break
 
                                 session_message = await self._read_stream.receive()
                                 if isinstance(session_message, Exception):
