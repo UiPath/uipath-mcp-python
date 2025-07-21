@@ -1,7 +1,7 @@
 [project]
 name = "$project_name"
 version = "0.0.1"
-description = "Description for '$project_name' project"
+description = "Description for $project_name project"
 authors = [{ name = "John Doe", email = "john.doe@myemail.com" }]
 dependencies = [
     "uipath-mcp>=0.0.96",

@@ -21,7 +21,6 @@ from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
     UiPathRuntimeResult,
-    UiPathTraceContext,
 )
 from uipath.tracing import LlmOpsHttpExporter
 
@@ -180,12 +179,11 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
-                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,
-                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,
+                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,  # type: ignore
+                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,  # type: ignore
                         "X-UIPATH-FolderKey": self.context.folder_key,
                     },
                 )
-
                 self._signalr_client.on("MessageReceived", self._handle_signalr_message)
                 self._signalr_client.on(
                     "SessionClosed", self._handle_signalr_session_closed
@@ -276,7 +274,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         if sys.platform == "win32":
             await asyncio.sleep(0.5)
 
-    async def _handle_signalr_session_closed(self, args: list[Any]) -> None:
+    async def _handle_signalr_session_closed(self, args: list[str]) -> None:
         """
         Handle session closed by server.
         """
@@ -306,7 +304,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         except Exception as e:
             logger.error(f"Error terminating session {session_id}: {str(e)}")
 
-    async def _handle_signalr_message(self, args: list[Any]) -> None:
+    async def _handle_signalr_message(self, args: list[str]) -> None:
         """
         Handle incoming SignalR messages.
         """
