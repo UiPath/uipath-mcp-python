@@ -1,4 +1,4 @@
-# Quickstart Guide: UiPath LangChain Agents
+# Quickstart Guide: UiPath Coded MCP Servers
 
 ## Introduction
 
@@ -47,12 +47,12 @@ We recommend using `uv` for package management. To create a new project:
 
 ```shell
 # Initialize a new uv project in the current directory
-> uv init . --python 3.10
+> uv init . --python 3.11
 
 # Create a new virtual environment
 # By default, uv creates a virtual environment in a directory called .venv
 > uv venv
-Using CPython 3.10.16 interpreter at: [PATH]
+Using CPython 3.11.16 interpreter at: [PATH]
 Creating virtual environment at: .venv
 Activate with: source .venv/bin/activate
 
@@ -119,6 +119,7 @@ This command creates the following files:
 
 /// warning
 _uipath new_ command will delete all previous `.py` files in the current directory.
+  ///
 
 ## Initialize Project
 
@@ -223,6 +224,7 @@ Now we can connect to the server using any MCP client. See the [Connecting to th
 
 /// warning
 Before running the MCP server, ensure that a serverless runtime (machine) is assigned to your folder in Orchestrator.
+///
 
 ## 2. Running on UiPath Cloud Platform
 
