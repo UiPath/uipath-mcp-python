@@ -154,11 +154,12 @@ Select tenant number: 0
 Selected tenant: Tenant1
 ✓  Authentication successful.
 ```
-# Run the MCP Server
+
+## Run the MCP Server
 
 There are two ways to run your coded MCP server:
 
-## 1. Running Locally (On-Prem)
+### 1. Running Locally (On-Prem)
 
 When running the server locally, JSON-RPC requests are tunneled from UiPath servers to your local server. During startup, the local server automatically registers itself with UiPath.
 
@@ -194,7 +195,7 @@ Registering server runtime ...
 ...
 ```
 
-### Verifying the Server
+#### Verifying the Server
 
 Once started successfully, your MCP server will appear in Orchestrator. Navigate to the MCP Servers tab in your configured folder:
 
@@ -226,11 +227,11 @@ Now we can connect to the server using any MCP client. See the [Connecting to th
 Before running the MCP server, ensure that a serverless runtime (machine) is assigned to your folder in Orchestrator.
 ///
 
-## 2. Running on UiPath Cloud Platform
+### 2. Running on UiPath Cloud Platform
 
 To deploy your MCP server to UiPath Cloud Platform, follow these steps:
 
-### (Optional) Customize the Package
+#### (Optional) Customize the Package
 
 Update author details in `pyproject.toml`:
 
@@ -238,7 +239,7 @@ Update author details in `pyproject.toml`:
 authors = [{ name = "Your Name", email = "your.name@example.com" }]
 ```
 
-### Package Your Project
+#### Package Your Project
 
 <!-- termynal -->
 ```shell
@@ -251,7 +252,7 @@ Authors    : John Doe
 ✓  Project successfully packaged.
 ```
 
-### Publish The Mcp Server Package
+#### Publish The Mcp Server Package
 
 <!-- termynal -->
 ```shell
@@ -270,7 +271,7 @@ Selected feed: Orchestrator Tenant Processes Feed
 
 After publishing, you can configure and manage your MCP server through the UiPath Cloud interface:
 
-### Configure in UiPath Cloud
+#### Configure in UiPath Cloud
 
 1. In Orchestrator, create a new Process using your published MCP Server package as the template
 2. In the folder where you want to deploy the server, navigate to the MCP Servers tab and click **Add MCP Server**
