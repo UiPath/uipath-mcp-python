@@ -175,17 +175,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 root_span.set_attribute("command", str(self._server.command))
                 root_span.set_attribute("args", json.dumps(self._server.args))
                 root_span.set_attribute("span_type", "MCP Server")
-
-                def token_factory() -> str:
-                    return os.environ.get("UIPATH_ACCESS_TOKEN", "")
-
+                bearer_token = os.environ.get("UIPATH_ACCESS_TOKEN")
                 self._signalr_client = SignalRClient(
                     signalr_url,
-                    access_token_factory=token_factory,
                     headers={
                         "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,  # type: ignore
                         "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,  # type: ignore
                         "X-UIPATH-FolderKey": self.context.folder_key,
+                        "Authorization": f"Bearer {bearer_token}",
                     },
                 )
                 self._signalr_client.on("MessageReceived", self._handle_signalr_message)
