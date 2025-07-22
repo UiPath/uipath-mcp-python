@@ -403,7 +403,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
                             # Only proceed if initialization was successful
                             tools_result = await session.list_tools()
-                            logger.info(tools_result)
+                            # logger.info(tools_result)
                         except asyncio.TimeoutError:
                             logger.error("Initialization timed out")
                             # Capture stderr output here, after the timeout

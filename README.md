@@ -6,11 +6,7 @@
 
 A Python SDK that enables hosting local MCP servers on UiPath Platform.
 
-Check out these sample projects to get started:
-
-- [GitHub MCP Server (Go)](https://github.com/UiPath/uipath-mcp-python/tree/main/samples/github-helper-agent) - Build, pack and publish executable MCP Servers created in Go
-- [Math MCP Server (Python)](https://github.com/UiPath/uipath-mcp-python/tree/main/samples/mcp-math-server) - Pack and publish custom Python code MCP Server
-
+Check out our [samples directory](https://github.com/UiPath/uipath-mcp-python/tree/main/samples) to explore various MCP server implementations. You can also learn how to [pack and host binary servers](https://github.com/UiPath/uipath-mcp-python/blob/main/docs/how_to_pack_binary.md) written in languages like Go within UiPath.
 
 ## Installation
 
