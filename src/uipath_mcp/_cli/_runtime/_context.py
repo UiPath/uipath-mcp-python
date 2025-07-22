@@ -32,11 +32,11 @@ class UiPathMcpRuntimeContext(UiPathRuntimeContext):
             with open(path, "r") as f:
                 config = json.load(f)
 
-            if "fpsContext" in config:
-                fps_context = config["fpsContext"]
+            config_runtime = config.get("runtime", {})
+            if "fpsContext" in config_runtime:
+                fps_context = config_runtime["fpsContext"]
                 mcp_instance.server_id = fps_context.get("Id")
                 mcp_instance.server_slug = fps_context.get("Slug")
-
         return mcp_instance
 
 
