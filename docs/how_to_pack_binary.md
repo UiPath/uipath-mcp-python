@@ -142,7 +142,7 @@ Authors    : John Doe
 
 To automate this process:
 
-1. Copy the [example workflow](/.github/workflows/build-github-mcp-server.yml) to `.github/workflows/` in your repository
+1. Copy the [example workflow](https://github.com/UiPath/uipath-mcp-python/blob/main/.github/workflows/build-github-mcp-server.yml) to `.github/workflows/` in your repository
 2. Go to GitHub Actions tab and run the workflow
 3. Provide the version when prompted
 4. Download the artifact after completion
