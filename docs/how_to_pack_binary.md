@@ -1,45 +1,50 @@
-# How to pack and publish the GitHub MCP Server
+# How To Pack Binary MCP Server
 
 This guide walks you through manually packaging and publishing the official [GitHub MCP server](https://github.com/github/github-mcp-server) to UiPath Orchestrator. An [example GitHub Actions workflow](/.github/workflows/build-github-mcp-server.yml) is provided to automate these steps.
+
+/// attention
+To build binary MCP servers locally, your environment must match UiPath's serverless runtime architecture (Ubuntu 64-bit AMD64). If you're on a different operating system, we recommend using the GitHub Actions workflow described in the [Automating with GitHub Actions](#automating-with-github-actions) section below.
+///
 
 ## Prerequisites
 
 - UiPath Cloud account
 - UiPath PAT (personal access token)
 - `go` (version 1.21+)
-- `python` (version 3.10+)
+- `python` (version 3.11+)
 - `uv` package manager (`pip install uv`)
 
 ## Steps
 
 ### 1. Clone and Build the GitHub MCP Server
 
-```bash
+<!-- termynal -->
+```shell
 # Clone the repository
-git clone https://github.com/github/github-mcp-server.git
-cd github-mcp-server
+> git clone https://github.com/github/github-mcp-server.git
+> cd github-mcp-server
 
 # Build the server
-cd cmd/github-mcp-server
-go build
+> cd cmd/github-mcp-server
+> go build
 ```
 
 ### 2. Create Package Directory
 
-```bash
-# Create a temp directory for packaging
-mkdir -p ~/mcp-package
-cp github-mcp-server ~/mcp-package/
-chmod +x ~/mcp-package/github-mcp-server
-cd ~/mcp-package
+<!-- termynal -->
+```shell
+# Create package directory and copy executable
+> mkdir -p mcp-package
+> cp github-mcp-server mcp-package/
+> cd mcp-package
 ```
 
 ### 3. Create Configuration Files
 
-Create `mcp.json`:
+Create the following files in the mcp-package directory:
 
-```bash
-cat > mcp.json << EOF
+1. `mcp.json` - Server configuration:
+```json
 {
   "servers": {
     "github": {
@@ -51,87 +56,87 @@ cat > mcp.json << EOF
     }
   }
 }
-EOF
 ```
 
-Create `pyproject.toml`:
-
-```bash
-cat > pyproject.toml << EOF
+2. `pyproject.toml` - Project metadata:
+```toml
 [project]
 name = "mcp-github-server"
 version = "0.0.1"
 description = "Official GitHub MCP Server"
 authors = [{ name = "John Doe" }]
 dependencies = [
-    "uipath-mcp>=0.0.74",
+    "uipath-mcp>=0.0.99",
 ]
-requires-python = ">=3.10"
-EOF
-```
-
-Create `.env` file:
-
-```bash
-cat > .env << EOF
-UIPATH_ACCESS_TOKEN=your_access_token_here
-UIPATH_URL=https://cloud.uipath.com/account/tenant
-EOF
+requires-python = ">=3.11"
 ```
 
 ### 4. Set Up Python Environment
 
-```bash
-# Create and activate virtual environment
-uv venv -p 3.10 .venv
-source .venv/bin/activate
+<!-- termynal -->
+```shell
+# Initialize a new uv project in the current directory
+> uv venv
+
+# Activate the virtual environment
+> source .venv/bin/activate
 
 # Install dependencies
-uv sync
+> uv sync
 ```
 
-### 5. Initialize UiPath Package
+### 5. Authenticate With UiPath
 
-```bash
-# Initialize UiPath project
-uipath init
+<!-- termynal -->
+```shell
+> uipath auth
+⠋ Authenticating with UiPath ...
+🔗 If a browser window did not open, please open the following URL in your browser: [LINK]
+👇 Select tenant:
+  0: Tenant1
+  1: Tenant2
+Select tenant number: 0
+Selected tenant: Tenant1
+✓  Authentication successful.
 ```
 
-This creates a `uipath.json` file.
+### 6. Initialize UiPath Package
 
-### 6. Edit uipath.json to Include the Executable
-
-Open `uipath.json` in a text editor:
-
-```bash
-nano uipath.json
+<!-- termynal -->
+```shell
+⠋ Initializing UiPath project ...
+✓   Created '.env' file.
+✓   Created 'uipath.json' file.
 ```
 
-Add a `settings` section with `filesIncluded`:
-
+Edit the generated `uipath.json` to include the executable:
 ```json
 {
   "settings": {
     "filesIncluded": ["github-mcp-server"]
-  },
-  "entrypoints": []
+  }
 }
 ```
 
-Save and exit.
-
 ### 7. Package for UiPath
 
-```bash
-# Create the package
-uipath pack
+<!-- termynal -->
+```shell
+⠋ Packaging project ...
+Name       : mcp-github-server
+Version    : 0.0.1
+Description: Official GitHub MCP Server
+Authors    : John Doe
+✓  Project successfully packaged.
 ```
-
-This creates a `.nupkg` file in the `.uipath` directory.
 
 ### 8. Upload to UiPath Orchestrator
 
-Upload the `.nupkg` file to your UiPath Orchestrator instance through the web interface, API or using the `uipath publish` CLI command.
+<!-- termynal -->
+```shell
+⠙ Publishing most recent package: mcp-github-server.0.0.1.nupkg ...
+✓  Package published successfully!
+```
 
 ## Automating with GitHub Actions
 
