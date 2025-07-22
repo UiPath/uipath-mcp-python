@@ -11,7 +11,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 from pydantic import BaseModel, Field
 from uipath_langchain.chat.models import UiPathAzureChatOpenAI
 
@@ -96,11 +96,11 @@ def process_comment(comment) -> PullRequestComment:
 
 @asynccontextmanager
 async def make_graph():
-    async with sse_client(
+    async with streamablehttp_client(
         url=os.getenv("UIPATH_MCP_SERVER_URL"),
         headers={"Authorization": f"Bearer {os.getenv('UIPATH_ACCESS_TOKEN')}"},
         timeout=60,
-    ) as (read, write):
+    ) as (read, write, session_id_callback):
         async with ClientSession(read, write) as session:
             all_tools = await load_mcp_tools(session)
 

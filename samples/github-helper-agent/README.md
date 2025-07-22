@@ -80,7 +80,7 @@ uv sync
 Set your MCP Remote Server URL as environment variables in `.env`:
 
 ```bash
-UIPATH_MCP_SERVER_URL=https://cloud.uipath.com/account/tenant/agenthub_/mcp/folder-key/github-mcp/sse
+UIPATH_MCP_SERVER_URL=https://cloud.uipath.com/account/tenant/agenthub_/mcp/folder-key/github-mcp/
 ```
 
 ## Debugging

@@ -6,7 +6,7 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 from uipath_langchain.chat.models import UiPathAzureChatOpenAI
 
 dotenv.load_dotenv()
@@ -20,19 +20,19 @@ UIPATH_ACCESS_TOKEN = os.getenv("UIPATH_ACCESS_TOKEN")
 
 @asynccontextmanager
 async def make_graph():
-    async with sse_client(
+    async with streamablehttp_client(
         url=GITHUB_MCP_SERVER_URL,
         headers={"Authorization": f"Bearer {UIPATH_ACCESS_TOKEN}"},
         timeout=60,
-    ) as (git_read, git_write):
+    ) as (git_read, git_write, git_session_id_callback):
         async with ClientSession(git_read, git_write) as git_session:
             all_github_tools = await load_mcp_tools(git_session)
 
-            async with sse_client(
+            async with streamablehttp_client(
                 url=SLACK_MCP_SERVER_URL,
                 headers={"Authorization": f"Bearer {UIPATH_ACCESS_TOKEN}"},
                 timeout=60,
-            ) as (slack_read, slack_write):
+            ) as (slack_read, slack_write, slack_session_id_callback):
                 async with ClientSession(slack_read, slack_write) as slack_session:
                     all_slack_tools = await load_mcp_tools(slack_session)
 
