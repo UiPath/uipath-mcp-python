@@ -8,7 +8,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 from pydantic import BaseModel
 from uipath_langchain.chat.models import UiPathAzureChatOpenAI
 
@@ -51,11 +51,11 @@ UIPATH_ACCESS_TOKEN = os.getenv("UIPATH_ACCESS_TOKEN")
 
 @asynccontextmanager
 async def make_graph():
-    async with sse_client(
+    async with streamablehttp_client(
         url=FUNCTIONS_MCP_SERVER_URL,
         headers={"Authorization": f"Bearer {UIPATH_ACCESS_TOKEN}"},
         timeout=60,
-    ) as (read, write):
+    ) as (read, write, session_id_callback):
         async with ClientSession(read, write) as session:
             await session.initialize()
             tools = await load_mcp_tools(session)

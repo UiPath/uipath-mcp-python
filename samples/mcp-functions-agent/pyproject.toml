@@ -5,7 +5,7 @@ description = "A coder agent that implements and tests Python functions using a 
 authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
 dependencies = [
     "uipath-langchain>=0.0.118",
-    "langgraph>=0.3.34",
-    "langchain-mcp-adapters>=0.0.9"
+    "langgraph>=0.5.4",
+    "langchain-mcp-adapters>=0.1.9"
 ]
 requires-python = ">=3.11"
