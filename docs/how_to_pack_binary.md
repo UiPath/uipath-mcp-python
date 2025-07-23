@@ -1,4 +1,4 @@
-# How To Pack Binary MCP Server
+# How To Pack Binary
 
 This guide walks you through manually packaging and publishing the official [GitHub MCP server](https://github.com/github/github-mcp-server) to UiPath Orchestrator. An [example GitHub Actions workflow](/.github/workflows/build-github-mcp-server.yml) is provided to automate these steps.
 
