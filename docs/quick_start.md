@@ -226,13 +226,19 @@ Now we can connect to the server using any MCP client. See the [Connecting to th
 
 /// Info
 This quickstart guide provides instructions for deploying the MCP Server in _My Workspace_ folder. Choosing this folder simplifies the configuration process, as you won’t need to manually handle the following:
+
 - Serverless machine allocation
+
 - Unattended robot permissions
+
 - Process creation (processes are automatically provisioned when a package is published to `My Workspace`)
 
 If you prefer to deploy the MCP Server in a different folder, additional steps will be required:
+
 1. Create a process from the MCP Server package.
+
 2. Ensure a [serverless runtime (machine)](https://docs.uipath.com/orchestrator/automation-cloud/latest/user-guide/executing-unattended-automations-with-serverless-robots) is assigned to the target folder in Orchestrator.
+
 3. Confirm that a user with [unattended robot permissions](https://docs.uipath.com/robot/standalone/2024.10/admin-guide/unattended-automations) is assigned to the target folder.
 ///
 
@@ -289,7 +295,7 @@ After publishing, you can configure and manage your MCP server through the UiPat
 
 2. In the configuration dialog:
    - Select `Coded` as the server type
-   - Choose the Process you created earlier
+   - Choose the `math-server` process
    - Click **Add** to deploy the server
 
 <picture data-light="../quick_start_images/configure-mcp-light.png" data-dark="../quick_start_images/configure-mcp-dark.png">
@@ -320,7 +326,7 @@ You can connect to your MCP server using any MCP client. Here's what you'll need
   />
 </picture>
 
-2. **Authentication**: Use your [Personal Access Token (PAT)](#prerequisites) as an authorization header
+2. **Authentication**: Use your [Personal Access Token (PAT)](#prerequisites) with _Orchestrator API Access scopes_ as authorization header
 3. **Transport**: Configure the client to use HTTP Streamable transport
 
 ## Next Steps
