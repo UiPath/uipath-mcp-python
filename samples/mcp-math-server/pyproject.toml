@@ -4,6 +4,6 @@ version = "0.0.1"
 description = "Advanced Math Operations MCP Server"
 authors = [{ name = "John Doe" }]
 dependencies = [
-    "uipath-mcp>=0.0.99",
+    "uipath-mcp>=0.0.101",
 ]
 requires-python = ">=3.11"

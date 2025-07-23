@@ -597,7 +597,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "uipath-mcp", specifier = ">=0.0.99" }]
+requires-dist = [{ name = "uipath-mcp", specifier = ">=0.0.101" }]
 
 [[package]]
 name = "mdurl"
@@ -1633,16 +1633,16 @@ wheels = [
 
 [[package]]
 name = "uipath-mcp"
-version = "0.0.99"
+version = "0.0.101"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
     { name = "pysignalr" },
     { name = "uipath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/90/cf/987b7aeab915ac9fc5afa4cd0e64db96838b7669935f632fa4b57a4ef2cc/uipath_mcp-0.0.99.tar.gz", hash = "sha256:be1ea2e293aad3dc22a796e7e4a0ae311a734c32d8cde32672586a1e4e2449f1", size = 1618556 }
+sdist = { url = "https://files.pythonhosted.org/packages/89/99/a190ce8a7cf173d254cb6e4586534d2abed58e415c4065158a76642fe869/uipath_mcp-0.0.101.tar.gz", hash = "sha256:255a28ac2c8932919b9de06600d7d7b35e67c8b7c84dc716b1e42c580bc9e74e", size = 1609808 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/07/3550286f40ac67f96b24b108bf5a1b0e445d967cf81349fd323c2a81b6fc/uipath_mcp-0.0.99-py3-none-any.whl", hash = "sha256:73929f885c50ae6e2b108345f7e0bd9eee761fff0a3fe3eebc7811fe12650bb3", size = 27111 },
+    { url = "https://files.pythonhosted.org/packages/15/9a/c178ec4be4a79188ed2af459dd2d7e578e1c6f28d4bc9ee93e9836164e5a/uipath_mcp-0.0.101-py3-none-any.whl", hash = "sha256:4cc2cc0a8639c82dd5aaa71d652fd29966e0eeacaad9a8a0bd23563069a3dbb7", size = 27133 },
 ]
 
 [[package]]
