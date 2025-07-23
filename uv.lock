@@ -2018,7 +2018,7 @@ wheels = [
 
 [[package]]
 name = "uipath-mcp"
-version = "0.0.100"
+version = "0.0.101"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },
@@ -2041,7 +2041,7 @@ dev = [
 requires-dist = [
     { name = "mcp", specifier = "==1.11.0" },
     { name = "pysignalr", specifier = "==1.3.0" },
-    { name = "uipath", specifier = ">=2.0.78" },
+    { name = "uipath", specifier = ">=2.0.78,<2.1.0" },
 ]
 
 [package.metadata.requires-dev]
