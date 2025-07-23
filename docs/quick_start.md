@@ -2,11 +2,11 @@
 
 ## Introduction
 
-This guide provides step-by-step instructions for setting up, creating, publishing, and running your first UiPath coded MCP Server.
+This guide provides instructions for setting up and running a UiPath coded MCP Server.
 
 ## Prerequisites
 
-Before proceeding, ensure you have the following prerequisites:
+You need:
 
 -   Python 3.11 or higher
 -   `pip` or `uv` package manager
@@ -15,7 +15,7 @@ Before proceeding, ensure you have the following prerequisites:
 
 ## Creating a New Project
 
-We recommend using `uv` for package management. To create a new project:
+Use `uv` for package management. To create a new project:
 
 //// tab | Linux, macOS, Windows Bash
 
@@ -90,7 +90,7 @@ Activate with: source .venv/bin/activate
 
 ## Create Your First UiPath Coded MCP Server
 
-Generate your first UiPath LangChain agent:
+Create your first MCP server
 
 <!-- termynal -->
 
@@ -108,6 +108,10 @@ Start 'math-server' as a self-hosted MCP server
 💡  2. Start the server locally: uipath run math-server
 ```
 
+/// warning
+_uipath new_ command deletes all previous `.py` files in the current directory.
+  ///
+
 This command creates the following files:
 
 | File Name        | Description                                                                            |
@@ -116,9 +120,6 @@ This command creates the following files:
 | `mcp.json`       | Configuration file needed for coded UiPath MCP Servers.                                |
 | `pyproject.toml` | Project metadata and dependencies as per [PEP 518](https://peps.python.org/pep-0518/). |
 
-/// warning
-_uipath new_ command will delete all previous `.py` files in the current directory.
-  ///
 
 ## Initialize Project
 
@@ -135,7 +136,7 @@ This command creates the following files:
 
 | File Name        | Description                                                                                                                       |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`           | Environment variables and secrets (this file will not be packed & published).                                                     |
+| `.env`           | Environment variables and secrets (this file is not packed & published).                                                     |
 | `uipath.json`    | Input/output JSON schemas and bindings.                                                                                           |
 
 ## Authenticate With UiPath
@@ -196,7 +197,7 @@ Registering server runtime ...
 
 #### Verifying the Server
 
-Once started successfully, your MCP server will appear in Orchestrator. Navigate to the MCP Servers tab in your configured folder:
+Once started successfully, your MCP server will appear in Orchestrator. Navigate to the **MCP Servers** tab in your configured folder:
 
 <picture data-light="../quick_start_images/self-hosted-light.png" data-dark="../quick_start_images/self-hosted-dark.png">
   <source
@@ -222,7 +223,7 @@ You can inspect the available tools by clicking on the server:
 
 Now we can connect to the server using any MCP client. See the [Connecting to the MCP Server](#connecting-to-the-mcp-server) section.
 
-### 2. Running on UiPath Cloud Platform
+### 2. Running on UiPath Automation Cloud
 
 /// Info
 This quickstart guide provides instructions for deploying the MCP Server in _My Workspace_ folder. Choosing this folder simplifies the configuration process, as you won’t need to manually handle the following:
@@ -233,7 +234,7 @@ This quickstart guide provides instructions for deploying the MCP Server in _My 
 
 - Process creation (processes are automatically provisioned when a package is published to `My Workspace`)
 
-If you prefer to deploy the MCP Server in a different folder, additional steps will be required:
+If you prefer to deploy the MCP Server in a different folder, additional steps are required:
 
 1. Create a process from the MCP Server package.
 
@@ -242,7 +243,7 @@ If you prefer to deploy the MCP Server in a different folder, additional steps w
 3. Confirm that a user with [unattended robot permissions](https://docs.uipath.com/robot/standalone/2024.10/admin-guide/unattended-automations) is assigned to the target folder.
 ///
 
-To deploy your MCP server to UiPath Cloud Platform, follow these steps:
+To deploy your MCP server to UiPath Automation Cloud, follow these steps:
 
 #### (Optional) Customize the Package
 
@@ -265,7 +266,7 @@ Authors    : John Doe
 ✓  Project successfully packaged.
 ```
 
-#### Publish The Mcp Server Package
+#### Publish The MCP Server Package
 
 <!-- termynal -->
 ```shell
@@ -277,11 +278,11 @@ Authors    : John Doe
 💡 Use the link above to configure any environment variables
 ```
 
-After publishing, you can configure and manage your MCP server through the UiPath Cloud interface:
+After publishing, you can configure and manage your MCP server through the UiPath Automation Cloud interface:
 
-#### Configure in UiPath Cloud
+#### Configure in UiPath Automation Cloud
 
-1. In `My Workspace`, navigate to the MCP Servers tab and click **Add MCP Server**
+1. In `My Workspace`, navigate to the **MCP Servers** tab and click **Add MCP Server**
 
 <picture data-light="../quick_start_images/add-mcp-light.png" data-dark="../quick_start_images/add-mcp-dark.png">
   <source
@@ -308,13 +309,13 @@ After publishing, you can configure and manage your MCP server through the UiPat
   />
 </picture>
 
-Once deployed, the server will automatically start and register its available tools. You can monitor the job status in the MCP Server side panel.
+Once deployed, the server automatically starts and registers its available tools. You can monitor the job status in the MCP Server side panel.
 
 ## Connecting to the MCP Server
 
-You can connect to your MCP server using any MCP client. Here's what you'll need:
+You can connect to your MCP server using any MCP client. Here's what you need:
 
-1. **MCP Server URL**: Copy this from the UiPath MCP Servers page in Orchestrator
+1. **MCP Server URL**: Copy this from the UiPath **MCP Servers** page in Orchestrator
 
 <picture data-light="../quick_start_images/copy-link-light.png" data-dark="../quick_start_images/copy-link-dark.png">
   <source
@@ -331,6 +332,6 @@ You can connect to your MCP server using any MCP client. Here's what you'll need
 
 ## Next Steps
 
-Congratulations! You have successfully set up, created, published, and run a Coded UiPath MCP Server. 🚀
+Congratulations! You have successfully set up, created, published, and run a coded UiPath MCP Server. 🚀
 
 For more coded MCP samples, please refer to our [samples section](https://github.com/UiPath/uipath-mcp-python/tree/main/samples) in GitHub.
