@@ -4,6 +4,6 @@ version = "0.0.1"
 description = "Description for $project_name project"
 authors = [{ name = "John Doe", email = "john.doe@myemail.com" }]
 dependencies = [
-    "uipath-mcp>=0.0.96",
+    "uipath-mcp>=0.0.101",
 ]
 requires-python = ">=3.11"
