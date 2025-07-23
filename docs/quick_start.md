@@ -6,13 +6,12 @@ This guide provides step-by-step instructions for setting up, creating, publishi
 
 ## Prerequisites
 
-Before proceeding, ensure you have the following installed:
+Before proceeding, ensure you have the following prerequisites:
 
 -   Python 3.11 or higher
 -   `pip` or `uv` package manager
 -   A UiPath Automation Cloud account with appropriate permissions
 -   A [UiPath Personal Access Token](https://docs.uipath.com/automation-cloud/automation-cloud/latest/api-guide/personal-access-tokens) with _Orchestrator API Access scopes_
--   A folder in Orchestrator with a serverless runtime (machine) assigned to it
 
 ## Creating a New Project
 
@@ -223,11 +222,19 @@ You can inspect the available tools by clicking on the server:
 
 Now we can connect to the server using any MCP client. See the [Connecting to the MCP Server](#connecting-to-the-mcp-server) section.
 
-/// warning
-Before running the MCP server, ensure that a serverless runtime (machine) is assigned to your folder in Orchestrator.
-///
-
 ### 2. Running on UiPath Cloud Platform
+
+/// Info
+This quickstart guide provides instructions for deploying the MCP Server in _My Workspace_ folder. Choosing this folder simplifies the configuration process, as you won’t need to manually handle the following:
+- Serverless machine allocation
+- Unattended robot permissions
+- Process creation (processes are automatically provisioned when a package is published to `My Workspace`)
+
+If you prefer to deploy the MCP Server in a different folder, additional steps will be required:
+1. Create a process from the MCP Server package.
+2. Ensure a [serverless runtime (machine)](https://docs.uipath.com/orchestrator/automation-cloud/latest/user-guide/executing-unattended-automations-with-serverless-robots) is assigned to the target folder in Orchestrator.
+3. Confirm that a user with [unattended robot permissions](https://docs.uipath.com/robot/standalone/2024.10/admin-guide/unattended-automations) is assigned to the target folder.
+///
 
 To deploy your MCP server to UiPath Cloud Platform, follow these steps:
 
@@ -256,25 +263,19 @@ Authors    : John Doe
 
 <!-- termynal -->
 ```shell
-> uipath publish
-⠏ Fetching available package feeds...
-👇 Select package feed:
-  0: Orchestrator Tenant Processes Feed
-  1: Folder Feed 1
-  2: Folder Feed 2
-  ...
-Select feed number: 0
-Selected feed: Orchestrator Tenant Processes Feed
-⠸ Publishing most recent package: math-server.0.0.1.nupkg ...
+> uipath publish --my-workspace
+⠙ Publishing most recent package: math-server.0.0.1.nupkg ...
 ✓  Package published successfully!
+⠦ Getting process information ...
+🔗 Process configuration link: [LINK]
+💡 Use the link above to configure any environment variables
 ```
 
 After publishing, you can configure and manage your MCP server through the UiPath Cloud interface:
 
 #### Configure in UiPath Cloud
 
-1. In Orchestrator, create a new Process using your published MCP Server package as the template
-2. In the folder where you want to deploy the server, navigate to the MCP Servers tab and click **Add MCP Server**
+1. In `My Workspace`, navigate to the MCP Servers tab and click **Add MCP Server**
 
 <picture data-light="../quick_start_images/add-mcp-light.png" data-dark="../quick_start_images/add-mcp-dark.png">
   <source
@@ -286,7 +287,7 @@ After publishing, you can configure and manage your MCP server through the UiPat
   />
 </picture>
 
-3. In the configuration dialog:
+2. In the configuration dialog:
    - Select `Coded` as the server type
    - Choose the Process you created earlier
    - Click **Add** to deploy the server
