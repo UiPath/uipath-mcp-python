@@ -1,15 +1,15 @@
 # How To Pack Binary
 
-This guide walks you through manually packaging and publishing the official [GitHub MCP server](https://github.com/github/github-mcp-server) to UiPath Orchestrator. An [example GitHub Actions workflow](/.github/workflows/build-github-mcp-server.yml) is provided to automate these steps.
+This guide explains how to manually package and publish the official [GitHub MCP server](https://github.com/github/github-mcp-server) to UiPath Orchestrator. For automation, see the [example GitHub Actions workflow](/.github/workflows/build-github-mcp-server.yml).
 
 /// attention
-To build binary MCP servers locally, your environment must match UiPath's serverless runtime architecture (Ubuntu 64-bit AMD64). If you're on a different operating system, we recommend using the GitHub Actions workflow described in the [Automating with GitHub Actions](#automating-with-github-actions) section below.
+To build binary MCP servers locally, your environment must match UiPath's serverless runtime architecture (Ubuntu 64-bit AMD64). On other operating systems, use the GitHub Actions workflow described in the [Automating with GitHub Actions](#automating-with-github-actions) section below.
 ///
 
 ## Prerequisites
 
-- UiPath Cloud account
-- UiPath PAT (personal access token)
+- UiPath Automation Cloud account
+- UiPath personal access token
 - `go` (version 1.21+)
 - `python` (version 3.11+)
 - `uv` package manager (`pip install uv`)
@@ -142,9 +142,9 @@ Authors    : John Doe
 
 To automate this process:
 
-1. Copy the [example workflow](https://github.com/UiPath/uipath-mcp-python/blob/main/.github/workflows/build-github-mcp-server.yml) to `.github/workflows/` in your repository
-2. Go to GitHub Actions tab and run the workflow
-3. Provide the version when prompted
-4. Download the artifact after completion
+1. Copy the [example workflow](https://github.com/UiPath/uipath-mcp-python/blob/main/.github/workflows/build-github-mcp-server.yml) to `.github/workflows/` in your repository.
+2. Go to **GitHub Actions** tab and run the workflow.
+3. Provide the version when prompted.
+4. Download the artifact after completion.
 
 The workflow handles all the manual steps automatically, including the crucial modification of `uipath.json` to include the executable in the package.
