@@ -365,7 +365,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         initialization_successful = False
         tools_result: Optional[ListToolsResult] = None
         server_stderr_output = ""
-        env_vars = dict(server.env)
+        env_vars = server.env
 
         # if server is Coded, include environment variables
         if self.server_type is UiPathServerType.Coded:
