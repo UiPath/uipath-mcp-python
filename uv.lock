@@ -1996,7 +1996,7 @@ wheels = [
 
 [[package]]
 name = "uipath"
-version = "2.0.78"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-monitor-opentelemetry" },
@@ -2011,9 +2011,9 @@ dependencies = [
     { name = "tomli" },
     { name = "truststore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/27/7d/b3d25cc9e2094cc4b5a9182aa5b03dfc0c9ee092b590d2e2404057916d47/uipath-2.0.78.tar.gz", hash = "sha256:d8c120bbdea0350050a55ffc61350ee75756136411c70a534ef50b77eb4fa862", size = 1842395 }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/3a/ec026311bf9e0bee34f310c9144337102fb527f129725362764e955f17e4/uipath-2.1.1.tar.gz", hash = "sha256:2a263d2b0c27892321b16a8538cbee6853e41dc14d89ae3ecaa130d9caf3b280", size = 1907270 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/96/496dd5d4f1946eefb51e9c915f20955a104588c87058bf8e7b519b9b4703/uipath-2.0.78-py3-none-any.whl", hash = "sha256:c6328afa36d6a41e21040adbf80457c01f038f435933aedffec7a6986cb82501", size = 133859 },
+    { url = "https://files.pythonhosted.org/packages/4e/1d/8fb6e56901d900d636be27e6b4fddff3d9d3ed19f9371653afdf970f7f73/uipath-2.1.1-py3-none-any.whl", hash = "sha256:4b48d716e557ba6263d13cdde6c9359c21c35eee3bb309990edb0de22cb5da37", size = 136616 },
 ]
 
 [[package]]
@@ -2041,7 +2041,7 @@ dev = [
 requires-dist = [
     { name = "mcp", specifier = "==1.11.0" },
     { name = "pysignalr", specifier = "==1.3.0" },
-    { name = "uipath", specifier = ">=2.0.78,<2.1.0" },
+    { name = "uipath", specifier = ">=2.1.0,<2.2.0" },
 ]
 
 [package.metadata.requires-dev]

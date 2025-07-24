@@ -17,7 +17,7 @@ load_dotenv()
 
 
 def mcp_run_middleware(
-    entrypoint: Optional[str], input: Optional[str], resume: bool
+    entrypoint: Optional[str], input: Optional[str], resume: bool, **kwargs
 ) -> MiddlewareResult:
     """Middleware to handle MCP server execution"""
 
@@ -37,6 +37,7 @@ def mcp_run_middleware(
             context.entrypoint = entrypoint
             context.input = input
             context.resume = resume
+            context.debug = kwargs.get("debug", False)
             context.logs_min_level = env.get("LOG_LEVEL", "INFO")
             context.job_id = env.get("UIPATH_JOB_KEY")
             context.folder_key = env.get("UIPATH_FOLDER_KEY")
