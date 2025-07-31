@@ -1,0 +1,11 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "local-stripe-server",
+            "uniqueId": "0467ec94-9b1b-49e9-a003-3513a0ed8ff2",
+            "type": "mcpserver",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
