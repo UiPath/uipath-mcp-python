@@ -15,15 +15,12 @@ class UiPathMcpRuntimeContext(UiPathRuntimeContext):
     server_slug: Optional[str] = None
 
     @classmethod
-    def from_config(cls, config_path=None):
+    def from_config(cls, config_path=None, **kwargs):
         """Load configuration from uipath.json file with MCP-specific handling."""
-        # Use the parent's implementation
         instance = super().from_config(config_path)
 
-        # Convert to our type (since parent returns UiPathRuntimeContext)
         mcp_instance = cls(**instance.model_dump())
 
-        # Add AgentHub-specific configuration handling
         import json
         import os
 
