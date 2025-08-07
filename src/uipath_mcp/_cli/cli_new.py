@@ -3,27 +3,11 @@ import shutil
 from typing import List, Optional, Tuple
 
 import click
+from uipath._cli._utils._common import clean_directory
 from uipath._cli._utils._console import ConsoleLogger
 from uipath._cli.middlewares import MiddlewareResult
 
 console = ConsoleLogger()
-
-
-def clean_directory(directory: str) -> None:
-    """Clean up Python files in the specified directory.
-
-    Args:
-        directory (str): Path to the directory to clean.
-
-    This function removes all Python files (*.py) from the specified directory.
-    It's used to prepare a directory for new MCP server template files.
-    """
-    for file_name in os.listdir(directory):
-        file_path = os.path.join(directory, file_name)
-
-        if os.path.isfile(file_path) and file_name.endswith(".py"):
-            # Delete the file
-            os.remove(file_path)
 
 
 def write_template_file(
