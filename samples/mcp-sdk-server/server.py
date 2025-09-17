@@ -57,7 +57,6 @@ def get_entity_types() -> Dict[str, str]:
 
 
 @mcp.tool()
-@mcp.tool()
 def get_sdk_methods(entity_type: str) -> Dict[str, Any]:
     """Returns detailed information about all methods available for a specific entity type.
 
