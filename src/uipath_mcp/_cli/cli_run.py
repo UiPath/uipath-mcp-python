@@ -3,7 +3,6 @@ import logging
 from os import environ as env
 from typing import Optional
 
-from dotenv import load_dotenv
 from uipath._cli._runtime._contracts import UiPathTraceContext
 from uipath._cli.middlewares import MiddlewareResult
 
@@ -13,7 +12,6 @@ from ._runtime._runtime import UiPathMcpRuntime
 from ._utils._config import McpConfig
 
 logger = logging.getLogger(__name__)
-load_dotenv()
 
 
 def mcp_run_middleware(
