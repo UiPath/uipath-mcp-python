@@ -47,6 +47,7 @@ dev = [
 [tool.ruff]
 line-length = 88
 indent-width = 4
+exclude = ["testcases/**"]
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
@@ -61,12 +62,8 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-plugins = [
-  "pydantic.mypy"
-]
-exclude = [
-    "samples/.*"
-]
+plugins = ["pydantic.mypy"]
+exclude = ["samples/.*", "testcases/.*"]
 
 follow_imports = "silent"
 warn_redundant_casts = true

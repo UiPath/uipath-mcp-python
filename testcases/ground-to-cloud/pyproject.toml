@@ -1,0 +1,14 @@
+[project]
+name = "mathmcp"
+version = "0.0.1"
+description = "Description for mathmcp project"
+authors = [{ name = "John Doe", email = "john.doe@myemail.com" }]
+dependencies = [
+    "mcp>=1.11.0",
+    "retry>=0.9.2",
+    "uipath-mcp",
+]
+requires-python = ">=3.11"
+
+[tool.uv.sources]
+uipath-mcp = { path = "../../", editable = true }

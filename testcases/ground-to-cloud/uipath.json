@@ -1,0 +1,11 @@
+{
+    "entryPoints": [
+        {
+            "filePath": "mathmcp-PRNUMBER",
+            "uniqueId": "163f06b8-31e6-4639-aa31-ae4a88968a92",
+            "type": "mcpserver",
+            "input": {},
+            "output": {}
+        }
+    ]
+}
