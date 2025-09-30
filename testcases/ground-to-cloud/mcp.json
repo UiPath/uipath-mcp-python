@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "mathmcp-PRNUMBER": {
+        "transport": "stdio",
+        "command": "python",
+        "args": ["server.py"]
+    }
+  }
+}
