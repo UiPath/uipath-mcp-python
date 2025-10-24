@@ -20,13 +20,14 @@ from uipath import UiPath
 from uipath._cli._runtime._contracts import (
     UiPathBaseRuntime,
     UiPathErrorCategory,
+    UiPathErrorCode,
     UiPathRuntimeResult,
 )
 from uipath.tracing import LlmOpsHttpExporter
 
 from .._utils._config import McpServer
 from ._context import UiPathMcpRuntimeContext, UiPathServerType
-from ._exception import UiPathMcpRuntimeError
+from ._exception import McpErrorCode, UiPathMcpRuntimeError
 from ._session import SessionServer
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         """Validate runtime inputs and load MCP server configuration."""
         if self.context.config is None:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing configuration",
                 "Configuration is required.",
                 UiPathErrorCategory.SYSTEM,
@@ -64,7 +65,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         if self.context.entrypoint is None:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing entrypoint",
                 "Entrypoint is required.",
                 UiPathErrorCategory.SYSTEM,
@@ -73,7 +74,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._server = self.context.config.get_server(self.context.entrypoint)
         if not self._server:
             raise UiPathMcpRuntimeError(
-                "SERVER_NOT_FOUND",
+                McpErrorCode.SERVER_NOT_FOUND,
                 "MCP server not found",
                 f"Server '{self.context.entrypoint}' not found in configuration",
                 UiPathErrorCategory.DEPLOYMENT,
@@ -88,7 +89,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         uipath_url = os.environ.get("UIPATH_URL")
         if not uipath_url:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing UIPATH_URL environment variable",
                 "Please run 'uipath auth'.",
                 UiPathErrorCategory.USER,
@@ -96,7 +97,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         if not self.context.trace_context:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing trace context",
                 "Trace context is required for SignalR connection.",
                 UiPathErrorCategory.SYSTEM,
@@ -104,7 +105,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         if not self.context.trace_context.tenant_id:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing tenant ID",
                 "Please run 'uipath auth'.",
                 UiPathErrorCategory.SYSTEM,
@@ -112,7 +113,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
         if not self.context.trace_context.org_id:
             raise UiPathMcpRuntimeError(
-                "CONFIGURATION_ERROR",
+                McpErrorCode.CONFIGURATION_ERROR,
                 "Missing organization ID",
                 "Please run 'uipath auth'.",
                 UiPathErrorCategory.SYSTEM,
@@ -152,7 +153,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 folder_path = os.environ.get("UIPATH_FOLDER_PATH")
                 if not folder_path:
                     raise UiPathMcpRuntimeError(
-                        "REGISTRATION_ERROR",
+                        McpErrorCode.REGISTRATION_ERROR,
                         "No UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable set.",
                         "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
                         UiPathErrorCategory.USER,
@@ -162,7 +163,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 )
                 if not self.context.folder_key:
                     raise UiPathMcpRuntimeError(
-                        "REGISTRATION_ERROR",
+                        McpErrorCode.REGISTRATION_ERROR,
                         "Folder NOT FOUND. Invalid UIPATH_FOLDER_PATH environment variable.",
                         "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
                         UiPathErrorCategory.USER,
@@ -235,7 +236,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 raise
             detail = f"Error: {str(e)}"
             raise UiPathMcpRuntimeError(
-                "EXECUTION_ERROR",
+                UiPathErrorCode.EXECUTION_ERROR,
                 "MCP Runtime execution failed",
                 detail,
                 UiPathErrorCategory.USER,
@@ -421,7 +422,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if server_stderr_output:
                 error_message += f"\nServer error output:\n{server_stderr_output}"
             raise UiPathMcpRuntimeError(
-                "INITIALIZATION_ERROR",
+                McpErrorCode.INITIALIZATION_ERROR,
                 "Server initialization failed",
                 error_message,
                 UiPathErrorCategory.DEPLOYMENT,
@@ -433,7 +434,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             if not tools_result:
                 raise UiPathMcpRuntimeError(
-                    "INITIALIZATION_ERROR",
+                    McpErrorCode.INITIALIZATION_ERROR,
                     "Server initialization failed",
                     "Failed to get tools list from server",
                     UiPathErrorCategory.DEPLOYMENT,
@@ -478,7 +479,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 )
 
             raise UiPathMcpRuntimeError(
-                "REGISTRATION_ERROR",
+                McpErrorCode.REGISTRATION_ERROR,
                 "Failed to register MCP Server",
                 str(e),
                 UiPathErrorCategory.SYSTEM,
