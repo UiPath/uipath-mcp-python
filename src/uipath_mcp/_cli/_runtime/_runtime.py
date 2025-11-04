@@ -402,8 +402,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             # Only proceed if initialization was successful
                             tools_result = await session.list_tools()
                             # logger.info(tools_result)
-                        except asyncio.TimeoutError:
-                            logger.error("Initialization timed out")
+                        except Exception as err:
+                            logger.error(f"Initialization error: {err}")
                             # Capture stderr output here, after the timeout
                             stderr_temp.seek(0)
                             server_stderr_output = stderr_temp.read()
@@ -418,7 +418,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         # Now that we're outside the context managers, check if initialization succeeded
         if not initialization_successful:
             await self._on_runtime_abort()
-            error_message = "The server process failed to initialize. Verify environment variables are set correctly."
+            error_message = "The server process failed to initialize."
             if server_stderr_output:
                 error_message += f"\nServer error output:\n{server_stderr_output}"
             raise UiPathMcpRuntimeError(
