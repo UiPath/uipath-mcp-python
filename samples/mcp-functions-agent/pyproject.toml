@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "A coder agent that implements and tests Python functions using a dynamic MCP server"
 authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
 dependencies = [
-    "uipath-langchain>=0.0.118",
+    "uipath-langchain>=0.0.118, <0.1.0",
     "langgraph>=0.5.4",
     "langchain-mcp-adapters>=0.1.9"
 ]
