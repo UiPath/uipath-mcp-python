@@ -28,43 +28,55 @@ async def call_add_tool():
 
     try:
         # Use streamable HTTP client to connect to the MCP server
-        async with streamablehttp_client(mcp_url, headers={ 'Authorization': f'Bearer {token}' }) as (read_stream, write_stream, _):
-            async with ClientSession(read_stream, write_stream) as session:
-                # Initialize the session
-                await session.initialize()
-
-                # List available tools
+        try:
+            async with streamablehttp_client(mcp_url, headers={ 'Authorization': f'Bearer {token}' }) as (read_stream, write_stream, _):
                 try:
-                    tools_result = await session.list_tools()
-                    available_tools = [tool.name for tool in tools_result.tools]
-                    expected_available_tools = [
-                        "add", "subtract", "multiply", "divide", "power", "square_root", "nth_root",
-                        "sin", "cos", "tan", "log10", "natural_log", "log_base", "mean", "median", "standard_deviation",
-                        "complex_add", "complex_multiply", "convert_temperature", "solve_quadratic", "get_constants"
-                    ]
+                    async with ClientSession(read_stream, write_stream) as session:
+                        # Initialize the session
+                        try:
+                            await session.initialize()
+                        except Exception as e:
+                            print(f"[Initialize] Error initializing session: {e}")
+                            raise e
 
-                    print (f"Available tools: {available_tools}")
+                        # List available tools
+                        try:
+                            tools_result = await session.list_tools()
+                            available_tools = [tool.name for tool in tools_result.tools]
+                            expected_available_tools = [
+                                "add", "subtract", "multiply", "divide", "power", "square_root", "nth_root",
+                                "sin", "cos", "tan", "log10", "natural_log", "log_base", "mean", "median", "standard_deviation",
+                                "complex_add", "complex_multiply", "convert_temperature", "solve_quadratic", "get_constants"
+                            ]
+
+                            print (f"Available tools: {available_tools}")
+                        except Exception as e:
+                            print(f"[Tools] Error listing tools: {e}")
+                            raise e
+
+                        if set(available_tools) != set(expected_available_tools):
+                            raise AssertionError(f"Tool sets don't match. Expected: {set(expected_available_tools)}, Got: {set(available_tools)}")
+
+                        # Call the add tool directly
+                        try:
+                            call_tool_result = await session.call_tool(name="add", arguments={"a": 7, "b": 5})
+
+                            expected_result = "12.0"
+                            actual_result = call_tool_result.content[0].text if call_tool_result.content else None
+                        except Exception as e:
+                            print(f"[Add Tool] Error calling add tool: {e}")
+                            raise e
+
+                        if actual_result != expected_result:
+                            raise AssertionError(f"Expected {expected_result}, got {actual_result}")
+
+                        print("Test completed successfully")
                 except Exception as e:
-                    print(f"[Tools] Error listing tools: {e}")
-                    raise AssertionError(f"Error listing tools: {e}") from e
-
-                if set(available_tools) != set(expected_available_tools):
-                    raise AssertionError(f"Tool sets don't match. Expected: {set(expected_available_tools)}, Got: {set(available_tools)}")
-
-                # Call the add tool directly
-                try:
-                    call_tool_result = await session.call_tool(name="add", arguments={"a": 7, "b": 5})
-
-                    expected_result = "12.0"
-                    actual_result = call_tool_result.content[0].text if call_tool_result.content else None
-                except Exception as e:
-                    print(f"[Add Tool] Error calling add tool: {e}")
-                    raise AssertionError(f"Error calling add tool: {e}") from e
-
-                if actual_result != expected_result:
-                    raise AssertionError(f"Expected {expected_result}, got {actual_result}")
-
-                print("Test completed successfully")
+                    print(f"[Client Session] Error during MCP session: {e}")
+                    raise e
+        except Exception as e:
+            print(f"[Streamable HTTP Client] Error connecting to MCP server: {e}")
+            raise e
     except Exception as e:
         print(f"Unexpected error connecting to MCP server: {e}")
         raise AssertionError(f"Connection error, {e}") from e
