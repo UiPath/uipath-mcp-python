@@ -19,16 +19,16 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Discover testcases
       id: discover
       run: |
         # Find all testcase folders (excluding common folders like README, etc.)
         testcase_dirs=$(find testcases -maxdepth 1 -type d -name "*-*" | sed 's|testcases/||' | sort)
-        
+
         echo "Found testcase directories:"
         echo "$testcase_dirs"
-        
+
         # Convert to JSON array for matrix
         testcases_json=$(echo "$testcase_dirs" | jq -R -s -c 'split("\n")[:-1]')
         echo "testcases=$testcases_json" >> $GITHUB_OUTPUT
@@ -42,10 +42,10 @@ jobs:
       fail-fast: false
       matrix:
         testcase: ${{ fromJson(needs.discover-testcases.outputs.testcases) }}
-        environment: [alpha]
-    
+        environment: [alpha, cloud]
+
     name: "${{ matrix.testcase }} / ${{ matrix.environment }}"
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -68,6 +68,6 @@ jobs:
         echo "Running testcase: ${{ matrix.testcase }}"
         echo "Environment: ${{ matrix.environment }}"
         echo "Working directory: $(pwd)"
-        
+
         # Execute the testcase run script directly
         bash run.sh
