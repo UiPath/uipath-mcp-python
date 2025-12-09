@@ -1,45 +1,4 @@
 from enum import Enum
-from typing import Optional
-
-from uipath._cli._runtime._contracts import UiPathRuntimeContext
-
-from .._utils._config import McpConfig
-
-
-class UiPathMcpRuntimeContext(UiPathRuntimeContext):
-    """Context information passed throughout the runtime execution."""
-
-    config: Optional[McpConfig] = None
-    folder_key: Optional[str] = None
-    server_id: Optional[str] = None
-    server_slug: Optional[str] = None
-
-    @classmethod
-    def from_config(
-        cls, config_path: str | None = None, **kwargs: object
-    ) -> "UiPathMcpRuntimeContext":
-        """Load configuration from uipath.json file with MCP-specific handling."""
-        # Use the parent's implementation
-        instance = super().from_config(config_path, **kwargs)
-
-        # Convert to our type (since parent returns UiPathRuntimeContext)
-        mcp_instance = cls(**instance.model_dump())
-
-        # Add AgentHub-specific configuration handling
-        import json
-        import os
-
-        path = config_path or "uipath.json"
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                config = json.load(f)
-
-            config_runtime = config.get("runtime", {})
-            if "fpsContext" in config_runtime:
-                fps_context = config_runtime["fpsContext"]
-                mcp_instance.server_id = fps_context.get("Id")
-                mcp_instance.server_slug = fps_context.get("Slug")
-        return mcp_instance
 
 
 class UiPathServerType(Enum):

@@ -16,7 +16,7 @@ class McpServer:
     ):
         self.name = name
         self.type = server_config.get("type")
-        self.command = server_config.get("command")
+        self.command: str = str(server_config.get("command"))
         self.args = server_config.get("args", [])
         self.env = server_config.get("env", {})
         for key in list(self.env.keys()):
