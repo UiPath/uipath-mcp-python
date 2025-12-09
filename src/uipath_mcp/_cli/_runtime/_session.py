@@ -14,7 +14,7 @@ from mcp.types import (
     JSONRPCResponse,
 )
 from opentelemetry import trace
-from uipath import UiPath
+from uipath.platform import UiPath
 
 from .._utils._config import McpServer
 from ._tracer import McpTracer
@@ -54,7 +54,7 @@ class SessionServer:
         """Start the server process in a separate task."""
         try:
             server_params = StdioServerParameters(
-                command=self._server_config.command,
+                command=str(self._server_config.command),
                 args=self._server_config.args,
                 env=self._server_config.env,
             )

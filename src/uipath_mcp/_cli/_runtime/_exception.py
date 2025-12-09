@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional, Union
 
-from uipath._cli._runtime._contracts import (
+from uipath.runtime.errors import (
     UiPathBaseRuntimeError,
     UiPathErrorCategory,
     UiPathErrorCode,
@@ -27,5 +27,5 @@ class UiPathMcpRuntimeError(UiPathBaseRuntimeError):
         status: Optional[int] = None,
     ):
         super().__init__(
-            code.value, title, detail, category, status, prefix="LlamaIndex"
+            code.value, title, detail, category, status, prefix="UiPathMCP"
         )
