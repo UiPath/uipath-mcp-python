@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "An automated agent that reviews GitHub pull requests and provides feedback on Slack"
 authors = [{ name = "Cristi Pufu", email = "cristian.pufu@uipath.com" }]
 dependencies = [
-    "uipath-langchain>=0.0.118",
+    "uipath-langchain>=0.0.118, <0.1.0",
     "langgraph>=0.5.4",
     "langchain-mcp-adapters>=0.1.9"
 ]
