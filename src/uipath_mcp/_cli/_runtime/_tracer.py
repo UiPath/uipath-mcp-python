@@ -17,10 +17,20 @@ class McpTracer:
         tracer: Optional[trace.Tracer] = None,
         logger: Optional[logging.Logger] = None,
     ):
-        self._tracer = tracer or trace.get_tracer(__name__)
+        # Store tracer reference but allow dynamic lookup
+        # If None is passed, we'll get the tracer dynamically each time
+        self._tracer_ref = tracer
         self._logger = logger or logging.getLogger(__name__)
         # Dictionary to store active request spans
         self._active_request_spans: Dict[str, Span] = {}
+
+    @property
+    def _tracer(self) -> trace.Tracer:
+        """Get the tracer dynamically to support runtime tracer provider updates."""
+        if self._tracer_ref:
+            return self._tracer_ref
+        # Get tracer from current global tracer provider
+        return trace.get_tracer(__name__)
 
     def create_span_for_message(self, message: types.JSONRPCMessage, **context) -> Span:
         """Create and configure a span for a message.

@@ -51,7 +51,9 @@ class SessionServer:
         self._uipath = UiPath()
         self._agenthub_url = agenthub_url
         self._agenthub_token = agenthub_token
-        self._mcp_tracer = McpTracer(tracer, logger)
+        # Pass None to McpTracer so it gets the tracer dynamically from the global tracer provider
+        # This ensures we use the correct tracer after OpenTelemetry is initialized
+        self._mcp_tracer = McpTracer(None, logger)
         self._server_stderr_output: Optional[str] = None
 
     @property
@@ -286,6 +288,7 @@ class SessionServer:
         The method will add 'agenthub_/' prefix automatically.
         """
         import httpx
+        from opentelemetry.propagate import inject
 
         if self._agenthub_url:
             # Use AGENTHUB_URL for local development
@@ -298,6 +301,14 @@ class SessionServer:
             headers = kwargs.pop("headers", {})
             if self._agenthub_token:
                 headers["Authorization"] = f"Bearer {self._agenthub_token}"
+
+            # Inject W3C trace context into headers for distributed tracing
+            # Only inject if OpenTelemetry is properly initialized
+            try:
+                if trace.get_tracer_provider() != trace._DefaultTracerProvider():  # type: ignore
+                    inject(headers)
+            except Exception as e:
+                logger.debug(f"Failed to inject trace context: {e}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, full_url, headers=headers, **kwargs)

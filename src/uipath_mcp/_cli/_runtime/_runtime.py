@@ -14,6 +14,7 @@ from mcp.types import JSONRPCResponse, ListToolsResult
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import SERVICE_NAME
 from pysignalr.client import SignalRClient
 from pysignalr.messages import CompletionMessage
 from uipath import UiPath
@@ -32,6 +33,65 @@ from ._session import SessionServer
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
+
+
+def _setup_opentelemetry_for_selfhosted() -> Optional[TracerProvider]:
+    """
+    Set up OpenTelemetry for self-hosted MCP servers based on environment variables.
+
+    This function initializes OpenTelemetry if OTEL_EXPORTER_OTLP_ENDPOINT is set
+    and no TracerProvider has been configured yet.
+
+    Returns:
+        TracerProvider if initialized, None otherwise
+    """
+    # Log all OTEL environment variables for debugging
+    otel_vars = {k: v for k, v in os.environ.items() if k.startswith("OTEL_")}
+    logger.info(f"🔍 OTEL environment variables: {otel_vars}")
+
+    # Check if TracerProvider is already set
+    current_provider = trace.get_tracer_provider()
+    logger.info(f"🔍 Current TracerProvider type: {type(current_provider).__name__}")
+
+    if current_provider != trace._DefaultTracerProvider():  # type: ignore
+        logger.info("✅ TracerProvider already configured, skipping initialization")
+        return None
+
+    # Check if OTLP endpoint is configured
+    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not otlp_endpoint:
+        logger.warning("⚠️  OTEL_EXPORTER_OTLP_ENDPOINT not set, skipping OpenTelemetry initialization")
+        logger.warning("⚠️  Self-hosted MCP server will NOT export traces!")
+        return None
+
+    try:
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+
+        # Get service name from environment or use default
+        service_name = os.environ.get("OTEL_SERVICE_NAME", "mcp-server")
+        logger.info(f"🚀 Initializing OpenTelemetry for service: {service_name}")
+
+        # Create resource with service name
+        resource = Resource.create({SERVICE_NAME: service_name})
+
+        # Create TracerProvider with resource
+        provider = TracerProvider(resource=resource)
+
+        # Add OTLP exporter
+        logger.info(f"🔌 Connecting to OTLP endpoint: {otlp_endpoint}")
+        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+        provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+        # Set as global TracerProvider
+        trace.set_tracer_provider(provider)
+
+        logger.info(f"✅ OpenTelemetry initialized successfully for '{service_name}'")
+        logger.info(f"✅ Traces will be exported to: {otlp_endpoint}")
+        return provider
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize OpenTelemetry: {e}", exc_info=True)
+        return None
 
 
 class UiPathMcpRuntime(UiPathBaseRuntime):
@@ -99,6 +159,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             httpx.Response object
         """
         import httpx
+        from opentelemetry import trace
+        from opentelemetry.propagate import inject
 
         if self._agenthub_url:
             # Use AGENTHUB_URL for local development
@@ -111,6 +173,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             headers = kwargs.pop("headers", {})
             if self._agenthub_token:
                 headers["Authorization"] = f"Bearer {self._agenthub_token}"
+
+            # Inject W3C trace context into headers for distributed tracing
+            # Only inject if OpenTelemetry is properly initialized
+            try:
+                if trace.get_tracer_provider() != trace._DefaultTracerProvider():  # type: ignore
+                    inject(headers)
+            except Exception as e:
+                logger.debug(f"Failed to inject trace context: {e}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.request(method, full_url, headers=headers, **kwargs)
@@ -177,12 +247,56 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             if self._server is None:
                 return None
 
-            if self.context.job_id:
-                self.trace_provider = TracerProvider()
+            # Initialize OpenTelemetry with support for BOTH UiPath LLMOps AND Aspire OTLP
+            # We always create a TracerProvider and add exporters as needed
+
+            # Check if we should initialize OpenTelemetry
+            should_init_otel = self.context.job_id or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+
+            if should_init_otel:
+                from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+
+                # Get service name
+                service_name = os.environ.get("OTEL_SERVICE_NAME", "mcp-server")
+                logger.info(f"🚀 Initializing OpenTelemetry for service: {service_name}")
+
+                # Create TracerProvider with resource
+                resource = Resource.create({SERVICE_NAME: service_name})
+                self.trace_provider = TracerProvider(resource=resource)
                 trace.set_tracer_provider(self.trace_provider)
-                self.trace_provider.add_span_processor(
-                    BatchSpanProcessor(LlmOpsHttpExporter())
-                )
+
+                # Add UiPath LLMOps exporter for sandboxed runtimes (with job_id)
+                if self.context.job_id:
+                    logger.info("📊 Adding UiPath LLMOps exporter for sandboxed runtime")
+                    self.trace_provider.add_span_processor(
+                        BatchSpanProcessor(LlmOpsHttpExporter())
+                    )
+
+                # Add Aspire OTLP exporter if configured (for both sandboxed and self-hosted)
+                otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+                if otlp_endpoint:
+                    try:
+                        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+                        logger.info(f"🔌 Adding Aspire OTLP exporter: {otlp_endpoint}")
+                        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+                        self.trace_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+                        logger.info("✅ Aspire OTLP exporter added successfully")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to add OTLP exporter: {e}", exc_info=True)
+
+                logger.info(f"✅ OpenTelemetry initialized with {len(self.trace_provider._active_span_processor._span_processors)} exporter(s)")
+            else:
+                logger.warning("⚠️  No telemetry exporters configured (no job_id and no OTEL_EXPORTER_OTLP_ENDPOINT)")
+                self.trace_provider = None
+
+            # CRITICAL: Re-get the tracer AFTER setting up OpenTelemetry
+            # The module-level tracer was created before we set the tracer provider
+            # so it's using the default (noop) provider. We need a fresh tracer.
+            if self.trace_provider:
+                logger.info("🔄 Re-initializing tracer with new TracerProvider")
+                global tracer
+                tracer = trace.get_tracer(__name__)
+                logger.info(f"✅ Tracer re-initialized: {tracer}")
 
             # Validate authentication configuration
             self._validate_auth()
