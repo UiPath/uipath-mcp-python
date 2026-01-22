@@ -29,7 +29,14 @@ RETRY_DELAY = 1
 class SessionServer:
     """Manages a server process for a specific session."""
 
-    def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
+    def __init__(
+        self,
+        server_config: McpServer,
+        server_slug: str,
+        session_id: str,
+        agenthub_url: Optional[str] = None,
+        agenthub_token: Optional[str] = None,
+    ):
         self._server_config = server_config
         self._server_slug = server_slug
         self._session_id = session_id
@@ -42,6 +49,8 @@ class SessionServer:
         self._last_request_id: Optional[str] = None
         self._last_message_id: Optional[str] = None
         self._uipath = UiPath()
+        self._agenthub_url = agenthub_url
+        self._agenthub_token = agenthub_token
         self._mcp_tracer = McpTracer(tracer, logger)
         self._server_stderr_output: Optional[str] = None
 
@@ -270,12 +279,40 @@ class SessionServer:
                         )
                         raise
 
+    async def _agenthub_request_async(self, method: str, path: str, **kwargs):
+        """Make a request to AgentHub, using AGENTHUB_URL if available.
+
+        AGENTHUB_URL should be the base URL up to tenant (e.g., http://localhost:5200/{account}/{tenant})
+        The method will add 'agenthub_/' prefix automatically.
+        """
+        import httpx
+
+        if self._agenthub_url:
+            # Use AGENTHUB_URL for local development
+            # Build URL: {base}/agenthub_/{path}
+            base_url = self._agenthub_url.rstrip('/')
+            normalized_path = path.lstrip('/')
+            full_url = f"{base_url}/agenthub_/{normalized_path}"
+
+            # Merge headers: start with any passed headers, then add auth token
+            headers = kwargs.pop("headers", {})
+            if self._agenthub_token:
+                headers["Authorization"] = f"Bearer {self._agenthub_token}"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.request(method, full_url, headers=headers, **kwargs)
+                return response
+        else:
+            # Fallback to standard UiPath client
+            normalized_path = path.lstrip('/')
+            return await self._uipath.api_client.request_async(method, f"agenthub_/{normalized_path}", **kwargs)
+
     async def _send_message_internal(
         self, message: JSONRPCMessage, request_id: str
     ) -> None:
-        response = await self._uipath.api_client.request_async(
+        response = await self._agenthub_request_async(
             "POST",
-            f"agenthub_/mcp/{self._server_slug}/out/message?sessionId={self._session_id}&requestId={request_id}",
+            f"mcp/{self._server_slug}/out/message?sessionId={self._session_id}&requestId={request_id}",
             json=message.model_dump(),
         )
         if response.status_code == 202:
@@ -284,9 +321,9 @@ class SessionServer:
             raise Exception(f"{response.status_code} - {response.text}")
 
     async def _get_messages_internal(self, request_id: str) -> None:
-        response = await self._uipath.api_client.request_async(
+        response = await self._agenthub_request_async(
             "GET",
-            f"agenthub_/mcp/{self._server_slug}/in/messages?sessionId={self._session_id}&requestId={request_id}",
+            f"mcp/{self._server_slug}/in/messages?sessionId={self._session_id}&requestId={request_id}",
         )
         if response.status_code == 200:
             self._last_request_id = request_id

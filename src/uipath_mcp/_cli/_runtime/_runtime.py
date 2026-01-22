@@ -369,7 +369,13 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             # Check if we have a session server for this session_id
             if session_id not in self._session_servers:
                 # Create and start a new session server
-                session_server = SessionServer(server, self.slug, session_id)
+                session_server = SessionServer(
+                    server,
+                    self.slug,
+                    session_id,
+                    agenthub_url=self._agenthub_url,
+                    agenthub_token=self._agenthub_token,
+                )
                 try:
                     await session_server.start()
                 except Exception as e:
