@@ -52,6 +52,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         self._cancel_event = asyncio.Event()
         self._keep_alive_task: Optional[asyncio.Task[None]] = None
         self._uipath = UiPath()
+        # Support AGENTHUB_URL for local development (overrides UIPATH_URL for AgentHub endpoints)
+        self._agenthub_url = os.environ.get("AGENTHUB_URL")
+        self._agenthub_token = os.environ.get("AGENTHUB_ACCESS_TOKEN")
 
     async def validate(self) -> None:
         """Validate runtime inputs and load MCP server configuration."""
@@ -80,6 +83,44 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.DEPLOYMENT,
             )
 
+    async def _agenthub_request_async(self, method: str, path: str, **kwargs):
+        """Make a request to AgentHub, using AGENTHUB_URL if available.
+
+        AGENTHUB_URL should be the base URL up to tenant (e.g., http://localhost:5200/{account}/{tenant})
+        The method will add 'agenthub_/' prefix automatically.
+
+        Args:
+            method: HTTP method
+            path: Path after agenthub_ (e.g., "mcp/slug/runtime/start")
+                 Should NOT start with '/' or include 'agenthub_' prefix
+            **kwargs: Additional arguments to pass to httpx (json, headers, etc.)
+
+        Returns:
+            httpx.Response object
+        """
+        import httpx
+
+        if self._agenthub_url:
+            # Use AGENTHUB_URL for local development
+            # Build URL: {base}/{agenthub_}/{path}
+            base_url = self._agenthub_url.rstrip('/')
+            normalized_path = path.lstrip('/')
+            full_url = f"{base_url}/agenthub_/{normalized_path}"
+
+            # Merge headers: start with any passed headers, then add auth token
+            headers = kwargs.pop("headers", {})
+            if self._agenthub_token:
+                headers["Authorization"] = f"Bearer {self._agenthub_token}"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.request(method, full_url, headers=headers, **kwargs)
+                response.raise_for_status()
+                return response
+        else:
+            # Fallback to standard UiPath client
+            normalized_path = path.lstrip('/')
+            return await self._uipath.api_client.request_async(method, f"agenthub_/{normalized_path}", **kwargs)
+
     def _validate_auth(self) -> None:
         """Validate authentication-related configuration.
 
@@ -87,7 +128,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             UiPathMcpRuntimeError: If any required authentication values are missing.
         """
         uipath_url = os.environ.get("UIPATH_URL")
-        if not uipath_url:
+        # AGENTHUB_URL can be used as an alternative to UIPATH_URL for local development
+        if not uipath_url and not self._agenthub_url:
             raise UiPathMcpRuntimeError(
                 McpErrorCode.CONFIGURATION_ERROR,
                 "Missing UIPATH_URL environment variable",
@@ -146,8 +188,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             self._validate_auth()
 
             # Set up SignalR client
-            uipath_url = os.environ.get("UIPATH_URL")
-            signalr_url = f"{uipath_url}/agenthub_/wsstunnel?slug={self.slug}&runtimeId={self._runtime_id}"
+            # Use AGENTHUB_URL if available (for local development), otherwise fallback to UIPATH_URL
+            base_url = os.environ.get("AGENTHUB_URL") or os.environ.get("UIPATH_URL")
+            signalr_url = f"{base_url}/agenthub_/wsstunnel?slug={self.slug}&runtimeId={self._runtime_id}"
 
             if not self.context.folder_key:
                 folder_path = os.environ.get("UIPATH_FOLDER_PATH")
@@ -176,7 +219,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 root_span.set_attribute("command", str(self._server.command))
                 root_span.set_attribute("args", json.dumps(self._server.args))
                 root_span.set_attribute("span_type", "MCP Server")
-                bearer_token = os.environ.get("UIPATH_ACCESS_TOKEN")
+                # Use AGENTHUB_ACCESS_TOKEN if available, otherwise fallback to UIPATH_ACCESS_TOKEN
+                bearer_token = self._agenthub_token or os.environ.get("UIPATH_ACCESS_TOKEN")
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
@@ -464,9 +508,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 tools_list.append(tool_info)
 
             # Register with UiPath MCP Server
-            await self._uipath.api_client.request_async(
+            await self._agenthub_request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/runtime/start?runtimeId={self._runtime_id}",
+                f"mcp/{self.slug}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
                 headers={"X-UIPATH-FolderKey": self.context.folder_key},
             )
@@ -491,9 +535,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Sandboxed runtimes are triggered by new client connections.
         """
         try:
-            response = await self._uipath.api_client.request_async(
+            response = await self._agenthub_request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/out/message?sessionId={session_id}",
+                f"mcp/{self.slug}/out/message?sessionId={session_id}",
                 json=JSONRPCResponse(
                     jsonrpc="2.0",
                     id=0,
@@ -570,9 +614,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Sends a runtime abort signalr to terminate all connected sessions.
         """
         try:
-            response = await self._uipath.api_client.request_async(
+            response = await self._agenthub_request_async(
                 "POST",
-                f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
+                f"mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
             )
             if response.status_code == 202:
                 logger.info(
