@@ -573,6 +573,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             response = await self._uipath.api_client.request_async(
                 "POST",
                 f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
+                headers={"X-UIPATH-FolderKey": self.context.folder_key},
             )
             if response.status_code == 202:
                 logger.info(
