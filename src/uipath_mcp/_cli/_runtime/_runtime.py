@@ -6,27 +6,30 @@ import os
 import sys
 import tempfile
 import uuid
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from httpx import HTTPStatusError
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.types import JSONRPCResponse, ListToolsResult
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pysignalr.client import SignalRClient
 from pysignalr.messages import CompletionMessage
-from uipath import UiPath
-from uipath._cli._runtime._contracts import (
-    UiPathBaseRuntime,
+from uipath.platform import UiPath
+from uipath.runtime import (
+    UiPathExecuteOptions,
+    UiPathRuntimeEvent,
+    UiPathRuntimeResult,
+    UiPathRuntimeSchema,
+    UiPathRuntimeStatus,
+    UiPathStreamOptions,
+)
+from uipath.runtime.errors import (
     UiPathErrorCategory,
     UiPathErrorCode,
-    UiPathRuntimeResult,
 )
-from uipath.tracing import LlmOpsHttpExporter
 
 from .._utils._config import McpServer
-from ._context import UiPathMcpRuntimeContext, UiPathServerType
+from ._context import UiPathServerType
 from ._exception import McpErrorCode, UiPathMcpRuntimeError
 from ._session import SessionServer
 
@@ -34,51 +37,51 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class UiPathMcpRuntime(UiPathBaseRuntime):
-    """
-    A runtime class for hosting UiPath MCP servers.
+class UiPathMcpRuntime:
+    """A runtime class for hosting UiPath MCP servers.
+
+    Implements UiPathRuntimeProtocol for compatibility with the UiPath runtime framework.
     """
 
-    def __init__(self, context: UiPathMcpRuntimeContext):
-        super().__init__(context)
-        self.context: UiPathMcpRuntimeContext = context
-        self._server: Optional[McpServer] = None
-        self._runtime_id = (
-            self.context.job_id if self.context.job_id else str(uuid.uuid4())
-        )
+    def __init__(
+        self,
+        server: McpServer,
+        runtime_id: str,
+        entrypoint: str,
+        folder_key: str | None = None,
+        server_id: str | None = None,
+        server_slug: str | None = None,
+    ):
+        """Initialize the MCP runtime.
+
+        Args:
+            server: The MCP server configuration.
+            runtime_id: Unique identifier for this runtime instance. (Job Key)
+            entrypoint: Entrypoint name (for schema generation).
+            folder_key: UiPath folder key for registration.
+            server_id: Server ID for registration.
+            server_slug: Server slug for registration.
+        """
+        self._server: McpServer = server
+        self._runtime_id = runtime_id or str(uuid.uuid4())
+        self._entrypoint = entrypoint
+        self._folder_key = folder_key
+        self._server_id = server_id
+        self._server_slug = server_slug
+
         self._signalr_client: Optional[SignalRClient] = None
         self._session_servers: Dict[str, SessionServer] = {}
         self._session_output: Optional[str] = None
         self._cancel_event = asyncio.Event()
         self._keep_alive_task: Optional[asyncio.Task[None]] = None
         self._uipath = UiPath()
+        self._cleanup_done = False
 
-    async def validate(self) -> None:
-        """Validate runtime inputs and load MCP server configuration."""
-        if self.context.config is None:
-            raise UiPathMcpRuntimeError(
-                McpErrorCode.CONFIGURATION_ERROR,
-                "Missing configuration",
-                "Configuration is required.",
-                UiPathErrorCategory.SYSTEM,
-            )
-
-        if self.context.entrypoint is None:
-            raise UiPathMcpRuntimeError(
-                McpErrorCode.CONFIGURATION_ERROR,
-                "Missing entrypoint",
-                "Entrypoint is required.",
-                UiPathErrorCategory.SYSTEM,
-            )
-
-        self._server = self.context.config.get_server(self.context.entrypoint)
-        if not self._server:
-            raise UiPathMcpRuntimeError(
-                McpErrorCode.SERVER_NOT_FOUND,
-                "MCP server not found",
-                f"Server '{self.context.entrypoint}' not found in configuration",
-                UiPathErrorCategory.DEPLOYMENT,
-            )
+        # Context fields accessed from environment
+        self._job_id = os.environ.get("UIPATH_JOB_KEY")
+        self._tenant_id = os.environ.get("UIPATH_TENANT_ID")
+        self._org_id = os.environ.get("UIPATH_ORGANIZATION_ID")
+        self._process_key = os.environ.get("UIPATH_PROCESS_UUID")
 
     def _validate_auth(self) -> None:
         """Validate authentication-related configuration.
@@ -95,15 +98,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.USER,
             )
 
-        if not self.context.trace_context:
-            raise UiPathMcpRuntimeError(
-                McpErrorCode.CONFIGURATION_ERROR,
-                "Missing trace context",
-                "Trace context is required for SignalR connection.",
-                UiPathErrorCategory.SYSTEM,
-            )
-
-        if not self.context.trace_context.tenant_id:
+        if not self._tenant_id:
             raise UiPathMcpRuntimeError(
                 McpErrorCode.CONFIGURATION_ERROR,
                 "Missing tenant ID",
@@ -111,7 +106,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.SYSTEM,
             )
 
-        if not self.context.trace_context.org_id:
+        if not self._org_id:
             raise UiPathMcpRuntimeError(
                 McpErrorCode.CONFIGURATION_ERROR,
                 "Missing organization ID",
@@ -119,29 +114,62 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.SYSTEM,
             )
 
-    async def execute(self) -> Optional[UiPathRuntimeResult]:
-        """
-        Start the MCP Server runtime.
+    async def get_schema(self) -> UiPathRuntimeSchema:
+        """Get schema for this MCP runtime.
 
         Returns:
-            Dictionary with execution results
+            UiPathRuntimeSchema with MCP server information.
+        """
+        return UiPathRuntimeSchema(
+            filePath=self._entrypoint,
+            uniqueId=str(uuid.uuid4()),
+            type="mcpserver",
+            input={"type": "object", "properties": {}},
+            output={"type": "object", "properties": {}},
+            graph=None,  # No graph for MCP servers
+        )
+
+    async def execute(
+        self,
+        input: dict[str, Any] | None = None,
+        options: UiPathExecuteOptions | None = None,
+    ) -> UiPathRuntimeResult:
+        """Start the MCP Server runtime.
+
+        Args:
+            input: Optional input dictionary (unused for MCP servers).
+            options: Optional execution options.
+
+        Returns:
+            UiPathRuntimeResult with execution results.
 
         Raises:
-            UiPathMcpRuntimeError: If execution fails
+            UiPathMcpRuntimeError: If execution fails.
         """
-        await self.validate()
+        return await self._run_server()
 
+    async def stream(
+        self,
+        input: dict[str, Any] | None = None,
+        options: UiPathStreamOptions | None = None,
+    ) -> AsyncGenerator[UiPathRuntimeEvent, None]:
+        """Stream execution for MCP server runtime.
+
+        MCP servers don't emit intermediate events, so this just yields the final result.
+        """
+        result = await self._run_server()
+        yield result
+
+    async def _run_server(self) -> UiPathRuntimeResult:
+        """Core server execution logic.
+
+        Returns:
+            UiPathRuntimeResult with execution results.
+
+        Raises:
+            UiPathMcpRuntimeError: If execution fails.
+        """
         try:
-            if self._server is None:
-                return None
-
-            if self.context.job_id:
-                self.trace_provider = TracerProvider()
-                trace.set_tracer_provider(self.trace_provider)
-                self.trace_provider.add_span_processor(
-                    BatchSpanProcessor(LlmOpsHttpExporter())
-                )
-
             # Validate authentication configuration
             self._validate_auth()
 
@@ -149,7 +177,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             uipath_url = os.environ.get("UIPATH_URL")
             signalr_url = f"{uipath_url}/agenthub_/wsstunnel?slug={self.slug}&runtimeId={self._runtime_id}"
 
-            if not self.context.folder_key:
+            if not self._folder_key:
                 folder_path = os.environ.get("UIPATH_FOLDER_PATH")
                 if not folder_path:
                     raise UiPathMcpRuntimeError(
@@ -158,10 +186,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
                         UiPathErrorCategory.USER,
                     )
-                self.context.folder_key = self._uipath.folders.retrieve_key(
+                self._folder_key = self._uipath.folders.retrieve_key(
                     folder_path=folder_path
                 )
-                if not self.context.folder_key:
+                if not self._folder_key:
                     raise UiPathMcpRuntimeError(
                         McpErrorCode.REGISTRATION_ERROR,
                         "Folder NOT FOUND. Invalid UIPATH_FOLDER_PATH environment variable.",
@@ -169,7 +197,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                         UiPathErrorCategory.USER,
                     )
 
-            logger.info(f"Folder key: {self.context.folder_key}")
+            logger.info(f"Folder key: {self._folder_key}")
 
             with tracer.start_as_current_span(self.slug) as root_span:
                 root_span.set_attribute("runtime_id", self._runtime_id)
@@ -180,9 +208,9 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
-                        "X-UiPath-Internal-TenantId": self.context.trace_context.tenant_id,  # type: ignore
-                        "X-UiPath-Internal-AccountId": self.context.trace_context.org_id,  # type: ignore
-                        "X-UIPATH-FolderKey": self.context.folder_key,
+                        "X-UiPath-Internal-TenantId": str(self._tenant_id),
+                        "X-UiPath-Internal-AccountId": str(self._org_id),
+                        "X-UIPATH-FolderKey": self._folder_key,
                         "Authorization": f"Bearer {bearer_token}",
                     },
                 )
@@ -221,16 +249,21 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             except (asyncio.CancelledError, asyncio.TimeoutError):
                                 pass
 
-                output_result = {}
+                output_result: dict[str, Any] = {}
                 if self._session_output:
                     output_result["content"] = self._session_output
 
-                self.context.result = UiPathRuntimeResult(output=output_result)
-                return self.context.result
+                return UiPathRuntimeResult(
+                    output=output_result,
+                    status=UiPathRuntimeStatus.SUCCESSFUL,
+                )
 
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received")
-            return None
+            return UiPathRuntimeResult(
+                output={},
+                status=UiPathRuntimeStatus.SUCCESSFUL,
+            )
         except Exception as e:
             if isinstance(e, UiPathMcpRuntimeError):
                 raise
@@ -242,12 +275,17 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 UiPathErrorCategory.USER,
             ) from e
         finally:
-            await self.cleanup()
-            if hasattr(self, "trace_provider") and self.trace_provider:
-                self.trace_provider.shutdown()
+            await self._cleanup()
 
-    async def cleanup(self) -> None:
+    async def dispose(self) -> None:
+        """Cleanup runtime resources."""
+        await self._cleanup()
+
+    async def _cleanup(self) -> None:
         """Clean up all resources."""
+        if self._cleanup_done:
+            return
+        self._cleanup_done = True
 
         await self._on_runtime_abort()
 
@@ -320,12 +358,10 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         logger.info(f"Received websocket notification... {session_id}")
 
         try:
-            server = cast(McpServer, self._server)
-
             # Check if we have a session server for this session_id
             if session_id not in self._session_servers:
                 # Create and start a new session server
-                session_server = SessionServer(server, self.slug, session_id)
+                session_server = SessionServer(self._server, self.slug, session_id)
                 try:
                     await session_server.start()
                 except Exception as e:
@@ -361,12 +397,11 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     async def _register(self) -> None:
         """Register the MCP server with UiPath."""
-        server = cast(McpServer, self._server)
 
         initialization_successful = False
         tools_result: Optional[ListToolsResult] = None
         server_stderr_output = ""
-        env_vars = server.env
+        env_vars = self._server.env
 
         # if server is Coded, include environment variables
         if self.server_type is UiPathServerType.Coded:
@@ -378,8 +413,8 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         try:
             # Create a temporary session to get tools
             server_params = StdioServerParameters(
-                command=server.command,
-                args=server.args,
+                command=self._server.command,
+                args=self._server.args,
                 env=env_vars,
             )
 
@@ -445,7 +480,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 "server": {
                     "Name": self.slug,
                     "Slug": self.slug,
-                    "Id": self.context.server_id,
+                    "Id": self._server_id,
                     "Version": "1.0.0",
                     "Type": self.server_type.value,
                 },
@@ -468,7 +503,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                 "POST",
                 f"agenthub_/mcp/{self.slug}/runtime/start?runtimeId={self._runtime_id}",
                 json=client_info,
-                headers={"X-UIPATH-FolderKey": self.context.folder_key},
+                headers={"X-UIPATH-FolderKey": self._folder_key},
             )
             logger.info("Registered MCP Server type successfully")
         except Exception as e:
@@ -547,11 +582,14 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
                             self._cancel_event.set()
 
                     if self._signalr_client:
+                        logger.info("Sending keep-alive ping...")
                         await self._signalr_client.send(
                             method="OnKeepAlive",
                             arguments=[],
                             on_invocation=on_keep_alive_response,  # type: ignore
                         )
+                    else:
+                        logger.error("SignalR client not initialized during keep-alive")
                 except Exception as e:
                     if not self._cancel_event.is_set():
                         logger.error(f"Error during keep-alive: {e}")
@@ -573,7 +611,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             response = await self._uipath.api_client.request_async(
                 "POST",
                 f"agenthub_/mcp/{self.slug}/runtime/abort?runtimeId={self._runtime_id}",
-                headers={"X-UIPATH-FolderKey": self.context.folder_key},
+                headers={"X-UIPATH-FolderKey": self._folder_key},
             )
             if response.status_code == 202:
                 logger.info(
@@ -596,7 +634,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
         Returns:
             bool: True if this is an sandboxed runtime (has a job_id), False otherwise.
         """
-        return self.context.job_id is not None
+        return self._job_id is not None
 
     @property
     def packaged(self) -> bool:
@@ -607,8 +645,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
             bool: True if this is a packaged runtime (has a process), False otherwise.
         """
         process_key = None
-        if self.context.trace_context is not None:
-            process_key = self.context.trace_context.process_key
+        process_key = self._process_key
 
         return (
             process_key is not None
@@ -617,7 +654,7 @@ class UiPathMcpRuntime(UiPathBaseRuntime):
 
     @property
     def slug(self) -> str:
-        return self.context.server_slug or self._server.name  # type: ignore
+        return self._server_slug or self._server.name
 
     @property
     def server_type(self) -> UiPathServerType:
