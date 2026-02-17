@@ -2,7 +2,7 @@ import asyncio
 import io
 import logging
 import tempfile
-from typing import Dict, Optional
+from typing import Any
 
 from mcp import StdioServerParameters, stdio_client
 from mcp.shared.message import SessionMessage
@@ -33,20 +33,20 @@ class SessionServer:
         self._server_config = server_config
         self._server_slug = server_slug
         self._session_id = session_id
-        self._read_stream = None
-        self._write_stream = None
-        self._mcp_session = None
-        self._run_task: Optional[asyncio.Task[None]] = None
+        self._read_stream: Any = None
+        self._write_stream: Any = None
+        self._mcp_session: Any = None
+        self._run_task: asyncio.Task[None] | None = None
         self._message_queue: asyncio.Queue[JSONRPCMessage] = asyncio.Queue()
-        self._active_requests: Dict[str, str] = {}
-        self._last_request_id: Optional[str] = None
-        self._last_message_id: Optional[str] = None
+        self._active_requests: dict[str, str] = {}
+        self._last_request_id: str | None = None
+        self._last_message_id: str | None = None
         self._uipath = UiPath()
         self._mcp_tracer = McpTracer(tracer, logger)
-        self._server_stderr_output: Optional[str] = None
+        self._server_stderr_output: str | None = None
 
     @property
-    def output(self) -> Optional[str]:
+    def output(self) -> str | None:
         """Returns the captured stderr output from the MCP server process."""
         return self._server_stderr_output
 
@@ -226,7 +226,7 @@ class SessionServer:
                 message = await self._message_queue.get()
                 try:
                     if self._write_stream:
-                        logger.info(
+                        logger.debug(
                             f"Session {self._session_id} - processing queued message: {message}..."
                         )
                         await self._write_stream.send(SessionMessage(message=message))
@@ -279,7 +279,7 @@ class SessionServer:
             json=message.model_dump(),
         )
         if response.status_code == 202:
-            logger.info(f"Outgoing message sent to UiPath MCP Server: {message}")
+            logger.debug(f"Outgoing message sent to UiPath MCP Server: {message}")
         elif 500 <= response.status_code < 600:
             raise Exception(f"{response.status_code} - {response.text}")
 
@@ -292,7 +292,7 @@ class SessionServer:
             self._last_request_id = request_id
             messages = response.json()
             for message in messages:
-                logger.info(f"Received message: {message}")
+                logger.debug(f"Received message: {message}")
                 json_message = JSONRPCMessage.model_validate(message)
                 if self._is_request(json_message):
                     message_id = self._get_message_id(json_message)

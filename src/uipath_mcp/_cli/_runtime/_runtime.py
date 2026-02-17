@@ -6,7 +6,8 @@ import os
 import sys
 import tempfile
 import uuid
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from httpx import HTTPStatusError
 from mcp import ClientSession, StdioServerParameters, stdio_client
@@ -74,11 +75,11 @@ class UiPathMcpRuntime:
         self._server_id = server_id
         self._server_slug = server_slug
 
-        self._signalr_client: Optional[SignalRClient] = None
-        self._session_servers: Dict[str, SessionServer] = {}
-        self._session_output: Optional[str] = None
+        self._signalr_client: SignalRClient | None = None
+        self._session_servers: dict[str, SessionServer] = {}
+        self._session_output: str | None = None
         self._cancel_event = asyncio.Event()
-        self._keep_alive_task: Optional[asyncio.Task[None]] = None
+        self._keep_alive_task: asyncio.Task[None] | None = None
         self._uipath = UiPath()
         self._cleanup_done = False
 
@@ -396,7 +397,7 @@ class UiPathMcpRuntime:
         """Register the MCP server with UiPath."""
 
         initialization_successful = False
-        tools_result: Optional[ListToolsResult] = None
+        tools_result: ListToolsResult | None = None
         server_stderr_output = ""
         env_vars = self._server.env
 
@@ -433,7 +434,6 @@ class UiPathMcpRuntime:
 
                             # Only proceed if initialization was successful
                             tools_result = await session.list_tools()
-                            # logger.info(tools_result)
                         except Exception as err:
                             logger.error(f"Initialization error: {err}")
                             # Capture stderr output here, after the timeout
@@ -472,7 +472,7 @@ class UiPathMcpRuntime:
                     UiPathErrorCategory.DEPLOYMENT,
                 )
 
-            tools_list: List[Dict[str, str | None]] = []
+            tools_list: list[dict[str, str | None]] = []
             client_info = {
                 "server": {
                     "Name": self.slug,
@@ -641,12 +641,9 @@ class UiPathMcpRuntime:
         Returns:
             bool: True if this is a packaged runtime (has a process), False otherwise.
         """
-        process_key = None
-        process_key = self._process_key
-
         return (
-            process_key is not None
-            and process_key != "00000000-0000-0000-0000-000000000000"
+            self._process_key is not None
+            and self._process_key != "00000000-0000-0000-0000-000000000000"
         )
 
     @property
