@@ -1,12 +1,9 @@
 import json
 import logging
-from typing import Dict, Optional, TypeVar
 
 import mcp.types as types
 from opentelemetry import trace
 from opentelemetry.trace import Span, StatusCode
-
-T = TypeVar("T")
 
 
 class McpTracer:
@@ -14,13 +11,13 @@ class McpTracer:
 
     def __init__(
         self,
-        tracer: Optional[trace.Tracer] = None,
-        logger: Optional[logging.Logger] = None,
+        tracer: trace.Tracer | None = None,
+        logger: logging.Logger | None = None,
     ):
         self._tracer = tracer or trace.get_tracer(__name__)
         self._logger = logger or logging.getLogger(__name__)
         # Dictionary to store active request spans
-        self._active_request_spans: Dict[str, Span] = {}
+        self._active_request_spans: dict[str, Span] = {}
 
     def create_span_for_message(self, message: types.JSONRPCMessage, **context) -> Span:
         """Create and configure a span for a message.

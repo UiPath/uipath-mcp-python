@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class McpServer:
     def __init__(
         self,
         name: str,
-        server_config: Dict[str, Any],
+        server_config: dict[str, Any],
     ):
         self.name = name
         self.type = server_config.get("type")
@@ -24,11 +24,11 @@ class McpServer:
                 self.env[key] = os.environ[key]
 
     @property
-    def file_path(self) -> Optional[str]:
+    def file_path(self) -> str | None:
         """Get the file path from args if available."""
         return self.args[0] if self.args and len(self.args) > 0 else None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the server model back to a dictionary."""
         return {"type": self.type, "command": self.command, "args": self.args}
 
@@ -39,8 +39,8 @@ class McpServer:
 class McpConfig:
     def __init__(self, config_path: str = "mcp.json"):
         self.config_path = config_path
-        self._servers: Dict[str, McpServer] = {}
-        self._raw_config: Dict[str, Any] = {}
+        self._servers: dict[str, McpServer] = {}
+        self._raw_config: dict[str, Any] = {}
 
         if self.exists:
             self._load_config()
@@ -68,11 +68,11 @@ class McpConfig:
             logger.error(f"Failed to load mcp.json: {str(e)}")
             raise
 
-    def get_servers(self) -> List[McpServer]:
+    def get_servers(self) -> list[McpServer]:
         """Get list of all server models."""
         return list(self._servers.values())
 
-    def get_server(self, name: str) -> Optional[McpServer]:
+    def get_server(self, name: str) -> McpServer | None:
         """
         Get a server model by name.
         If there's only one server available, return that one regardless of name.
@@ -85,11 +85,11 @@ class McpConfig:
         # Otherwise, fall back to looking up by name
         return self._servers.get(name)
 
-    def get_server_names(self) -> List[str]:
+    def get_server_names(self) -> list[str]:
         """Get list of all server names."""
         return list(self._servers.keys())
 
-    def load_config(self) -> Dict[str, Any]:
+    def load_config(self) -> dict[str, Any]:
         """Load and validate MCP servers configuration."""
         if not self.exists:
             raise FileNotFoundError(f"Config file not found: {self.config_path}")

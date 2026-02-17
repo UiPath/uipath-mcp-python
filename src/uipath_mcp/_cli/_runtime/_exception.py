@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Optional, Union
 
 from uipath.runtime.errors import (
     UiPathBaseRuntimeError,
@@ -20,11 +19,11 @@ class UiPathMcpRuntimeError(UiPathBaseRuntimeError):
 
     def __init__(
         self,
-        code: Union[McpErrorCode, UiPathErrorCode],
+        code: McpErrorCode | UiPathErrorCode,
         title: str,
         detail: str,
         category: UiPathErrorCategory = UiPathErrorCategory.UNKNOWN,
-        status: Optional[int] = None,
+        status: int | None = None,
     ):
         super().__init__(
             code.value, title, detail, category, status, prefix="UiPathMCP"
