@@ -31,7 +31,13 @@ RETRY_DELAY = 1
 class BaseSessionServer(ABC):
     """Base class with transport-agnostic message relay logic."""
 
-    def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
+    def __init__(
+        self,
+        server_config: McpServer,
+        server_slug: str,
+        session_id: str,
+        uipath: UiPath,
+    ):
         self._server_config = server_config
         self._server_slug = server_slug
         self._session_id = session_id
@@ -42,7 +48,7 @@ class BaseSessionServer(ABC):
         self._active_requests: dict[str, str] = {}
         self._last_request_id: str | None = None
         self._last_message_id: str | None = None
-        self._uipath = UiPath()
+        self._uipath = uipath
         self._mcp_tracer = McpTracer(tracer, logger)
 
     @property
@@ -284,9 +290,7 @@ class BaseSessionServer(ABC):
 class StdioSessionServer(BaseSessionServer):
     """Manages a stdio server process for a specific session."""
 
-    def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
-        super().__init__(server_config, server_slug, session_id)
-        self._server_stderr_output: str | None = None
+    _server_stderr_output: str | None = None
 
     @property
     def output(self) -> str | None:
