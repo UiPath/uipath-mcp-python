@@ -178,3 +178,11 @@ cython_debug/
 **/.uipath
 **/**.nupkg
 **/__uipath/
+
+
+**/samples/**/.agent/
+**/samples/**/.claude/
+**/samples/**/AGENTS.md
+**/samples/**/CLAUDE.md
+**/samples/**/entry-points.json
+**/samples/**/uv.lock

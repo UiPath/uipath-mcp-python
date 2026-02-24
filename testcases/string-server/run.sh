@@ -24,7 +24,7 @@ uv run uipath init
 # Generate dynamic values
 PR_NUMBER=${GITHUB_PR_NUMBER:-"local"}
 UNIQUE_ID=$(cat /proc/sys/kernel/random/uuid)
-MCP_SERVER_NAME="mathmcp-${PR_NUMBER}"
+MCP_SERVER_NAME="stringmcp-${PR_NUMBER}"
 
 echo "Updating uipath.json with dynamic values... PR Number: $PR_NUMBER, MCP Server Name: $MCP_SERVER_NAME, Unique ID: $UNIQUE_ID"
 
@@ -34,7 +34,7 @@ sed -i '/^UIPATH_TENANT_ID=[[:space:]]*$/d' .env
 # Replace placeholders in uipath.json using sed
 sed -i "s/PRNUMBER/$PR_NUMBER/g" mcp.json
 sed -i "s/PRNUMBER/$PR_NUMBER/g" uipath.json
-sed -i "s/163f06b8-31e6-4639-aa31-ae4a88968a92/$UNIQUE_ID/g" uipath.json
+sed -i "s/a1b2c3d4-5678-9abc-def0-1234567890ab/$UNIQUE_ID/g" uipath.json
 
 echo "Packing agent..."
 uv run uipath pack
