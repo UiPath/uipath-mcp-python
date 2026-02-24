@@ -110,8 +110,25 @@ class UiPathMcpRuntimeFactory:
                 McpErrorCode.SERVER_NOT_FOUND,
                 "MCP server not found",
                 f"Server '{entrypoint}' not found. Available: {available}",
-                UiPathErrorCategory.DEPLOYMENT,
+                UiPathErrorCategory.USER,
             )
+
+        # Validate streamable-http configuration
+        if server.is_streamable_http:
+            if not server.url:
+                raise UiPathMcpRuntimeError(
+                    McpErrorCode.CONFIGURATION_ERROR,
+                    "Invalid configuration",
+                    f"Server '{entrypoint}' uses streamable-http transport but 'url' is not specified in mcp.json",
+                    UiPathErrorCategory.USER,
+                )
+            if not server.command or server.command == "None":
+                raise UiPathMcpRuntimeError(
+                    McpErrorCode.CONFIGURATION_ERROR,
+                    "Invalid configuration",
+                    f"Server '{entrypoint}' uses streamable-http transport but 'command' is not specified in mcp.json",
+                    UiPathErrorCategory.USER,
+                )
 
         # Validate runtime_id is a valid UUID, generate new one if not
         try:

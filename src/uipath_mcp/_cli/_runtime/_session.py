@@ -2,9 +2,11 @@ import asyncio
 import io
 import logging
 import tempfile
+from abc import ABC, abstractmethod
 from typing import Any
 
 from mcp import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.message import SessionMessage
 from mcp.types import (
     ErrorData,
@@ -26,8 +28,8 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1
 
 
-class SessionServer:
-    """Manages a server process for a specific session."""
+class BaseSessionServer(ABC):
+    """Base class with transport-agnostic message relay logic."""
 
     def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
         self._server_config = server_config
@@ -35,7 +37,6 @@ class SessionServer:
         self._session_id = session_id
         self._read_stream: Any = None
         self._write_stream: Any = None
-        self._mcp_session: Any = None
         self._run_task: asyncio.Task[None] | None = None
         self._message_queue: asyncio.Queue[JSONRPCMessage] = asyncio.Queue()
         self._active_requests: dict[str, str] = {}
@@ -43,32 +44,34 @@ class SessionServer:
         self._last_message_id: str | None = None
         self._uipath = UiPath()
         self._mcp_tracer = McpTracer(tracer, logger)
-        self._server_stderr_output: str | None = None
 
     @property
+    @abstractmethod
     def output(self) -> str | None:
-        """Returns the captured stderr output from the MCP server process."""
-        return self._server_stderr_output
+        """Returns captured output from the server process, if any."""
+        ...
 
+    @abstractmethod
     async def start(self) -> None:
-        """Start the server process in a separate task."""
-        try:
-            server_params = StdioServerParameters(
-                command=str(self._server_config.command),
-                args=self._server_config.args,
-                env=self._server_config.env,
-            )
+        """Start the session."""
+        ...
 
-            # Start the server process in a separate task
-            self._run_task = asyncio.create_task(self._run_server(server_params))
-            self._run_task.add_done_callback(self._run_server_callback)
+    async def stop(self) -> None:
+        """Clean up resources and stop the session."""
+        if self._run_task and not self._run_task.done():
+            self._run_task.cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(self._run_task), timeout=3.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
+            except Exception as e:
+                logger.error(
+                    f"Error during task cancellation for session {self._session_id}: {e}"
+                )
 
-        except Exception as e:
-            logger.error(
-                f"Error starting session {self._session_id}: {e}", exc_info=True
-            )
-            await self.stop()
-            raise
+        self._run_task = None
+        self._read_stream = None
+        self._write_stream = None
 
     async def on_message_received(self, request_id: str) -> None:
         """Get new incoming messages from UiPath MCP Server."""
@@ -89,128 +92,79 @@ class SessionServer:
                     )
                     raise
 
-    async def stop(self) -> None:
-        """Clean up resources and stop the server."""
-        # Cancel the context task if it exists
-        if self._run_task and not self._run_task.done():
-            self._run_task.cancel()
-            try:
-                await asyncio.wait_for(asyncio.shield(self._run_task), timeout=3.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
-            except Exception as e:
-                logger.error(
-                    f"Error during task cancellation for session {self._session_id}: {e}"
-                )
+    async def _relay_messages(self) -> None:
+        """Transport-agnostic message relay loop.
 
-        # The context managers in _run_server will handle resource cleanup
-        self._run_task = None
-        self._read_stream = None
-        self._write_stream = None
-        self._mcp_session = None
+        Reads messages from the local server's read stream, matches responses
+        to request IDs, and sends them back.
+        """
+        consumer_task = asyncio.create_task(self._consume_messages())
 
-    async def _run_server(self, server_params: StdioServerParameters) -> None:
-        """Run the local MCP server process."""
-        logger.info(f"Starting local MCP Server process for session {self._session_id}")
-        self._server_stderr_output = None
-        with tempfile.TemporaryFile(mode="w+b") as stderr_temp_binary:
-            stderr_temp = io.TextIOWrapper(stderr_temp_binary, encoding="utf-8")
-            try:
-                async with stdio_client(server_params, errlog=stderr_temp) as (
-                    read,
-                    write,
-                ):
-                    self._read_stream, self._write_stream = read, write
+        try:
+            while True:
+                session_message = None
+                try:
+                    if self._read_stream is None:
+                        logger.error("Read stream is not initialized")
+                        break
 
-                    # Start the message consumer task
-                    consumer_task = asyncio.create_task(self._consume_messages())
-
-                    # Process incoming messages from the local server
-                    try:
-                        while True:
-                            # Get message from local server
-                            session_message = None
-                            try:
-                                if self._read_stream is None:
-                                    logger.error("Read stream is not initialized")
-                                    break
-
-                                session_message = await self._read_stream.receive()
-                                if isinstance(session_message, Exception):
-                                    logger.error(f"Received error: {session_message}")
-                                    continue
-                                message = session_message.message
-                                # For responses, determine which request_id to use
-                                if self._is_response(message):
-                                    message_id = self._get_message_id(message)
-                                    if (
-                                        message_id
-                                        and message_id in self._active_requests
-                                    ):
-                                        # Use the stored request_id for this response
-                                        request_id = self._active_requests[message_id]
-                                        # Send with the matched request_id
-                                        await self._send_message(message, request_id)
-                                        # Clean up the mapping after use
-                                        del self._active_requests[message_id]
-                                    else:
-                                        # If no mapping found, use the last known request_id
-                                        if self._last_request_id is not None:
-                                            await self._send_message(
-                                                message, self._last_request_id
-                                            )
-                                else:
-                                    # For non-responses, use the last known request_id
-                                    if self._last_request_id is not None:
-                                        await self._send_message(
-                                            message, self._last_request_id
-                                        )
-                            except Exception as e:
-                                if session_message:
-                                    logger.info(session_message)
-                                logger.error(
-                                    f"Error processing message for session {self._session_id}: {e}",
-                                    exc_info=True,
-                                )
-                                if self._last_request_id is not None:
-                                    await self._send_message(
-                                        JSONRPCMessage(
-                                            root=JSONRPCError(
-                                                jsonrpc="2.0",
-                                                # Use the last known message id for error reporting
-                                                id=self._last_message_id,
-                                                error=ErrorData(
-                                                    code=-32000,
-                                                    message=f"Error processing message: {e}",
-                                                ),
-                                            )
-                                        ),
-                                        self._last_request_id,
-                                    )
-                                continue
-                    finally:
-                        # Cancel the consumer when we exit the loop
-                        consumer_task.cancel()
-                        try:
-                            await asyncio.wait_for(consumer_task, timeout=2.0)
-                        except (asyncio.CancelledError, asyncio.TimeoutError):
-                            pass
-
-            except* Exception as eg:
-                for exception in eg.exceptions:
+                    session_message = await self._read_stream.receive()
+                    if isinstance(session_message, Exception):
+                        logger.error(f"Received error: {session_message}")
+                        continue
+                    message = session_message.message
+                    # For responses, determine which request_id to use
+                    if self._is_response(message):
+                        message_id = self._get_message_id(message)
+                        if message_id and message_id in self._active_requests:
+                            # Use the stored request_id for this response
+                            request_id = self._active_requests[message_id]
+                            # Send with the matched request_id
+                            await self._send_message(message, request_id)
+                            # Clean up the mapping after use
+                            del self._active_requests[message_id]
+                        else:
+                            # If no mapping found, use the last known request_id
+                            if self._last_request_id is not None:
+                                await self._send_message(message, self._last_request_id)
+                    else:
+                        # For non-responses, use the last known request_id
+                        if self._last_request_id is not None:
+                            await self._send_message(message, self._last_request_id)
+                except Exception as e:
+                    if session_message:
+                        logger.info(session_message)
                     logger.error(
-                        f"Unexpected error for session {self._session_id}: {exception}",
+                        f"Error processing message for session {self._session_id}: {e}",
                         exc_info=True,
                     )
-            finally:
-                stderr_temp.seek(0)
-                self._server_stderr_output = stderr_temp.read()
-                logger.error(self._server_stderr_output)
+                    if self._last_request_id is not None:
+                        await self._send_message(
+                            JSONRPCMessage(
+                                root=JSONRPCError(
+                                    jsonrpc="2.0",
+                                    # Use the last known message id for error reporting
+                                    id=self._last_message_id,
+                                    error=ErrorData(
+                                        code=-32000,
+                                        message=f"Error processing message: {e}",
+                                    ),
+                                )
+                            ),
+                            self._last_request_id,
+                        )
+                    continue
+        finally:
+            # Cancel the consumer when we exit the loop
+            consumer_task.cancel()
+            try:
+                await asyncio.wait_for(consumer_task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
 
-    def _run_server_callback(self, task):
+    def _run_server_callback(self, task: asyncio.Task[None]) -> None:
         """Handle task completion."""
         try:
-            # Get the result to propagate any exceptions
             task.result()
         except asyncio.CancelledError:
             pass
@@ -219,7 +173,7 @@ class SessionServer:
                 f"Server task for session {self._session_id} failed: {e}", exc_info=True
             )
 
-    async def _consume_messages(self):
+    async def _consume_messages(self) -> None:
         """Consume messages from the queue and send them to the local server."""
         try:
             while True:
@@ -292,13 +246,17 @@ class SessionServer:
             self._last_request_id = request_id
             messages = response.json()
             for message in messages:
-                logger.debug(f"Received message: {message}")
                 json_message = JSONRPCMessage.model_validate(message)
-                if self._is_request(json_message):
+                if isinstance(json_message.root, JSONRPCRequest):
+                    logger.info(
+                        f"Session {self._session_id[:8]}: {json_message.root.method}"
+                    )
                     message_id = self._get_message_id(json_message)
                     if message_id:
                         self._last_message_id = message_id
                         self._active_requests[message_id] = request_id
+                else:
+                    logger.debug(f"Received message: {message}")
                 with self._mcp_tracer.create_span_for_message(
                     json_message,
                     session_id=self._session_id,
@@ -308,13 +266,6 @@ class SessionServer:
                     await self._message_queue.put(json_message)
         elif 500 <= response.status_code < 600:
             raise Exception(f"{response.status_code} - {response.text}")
-
-    def _is_request(self, message: JSONRPCMessage) -> bool:
-        """Check if a message is a JSONRPCRequest."""
-        if hasattr(message, "root"):
-            root = message.root
-            return isinstance(root, JSONRPCRequest)
-        return False
 
     def _is_response(self, message: JSONRPCMessage) -> bool:
         """Check if a message is a JSONRPCResponse or JSONRPCError."""
@@ -328,3 +279,101 @@ class SessionServer:
         if hasattr(message, "root") and hasattr(message.root, "id"):
             return str(message.root.id)
         return ""
+
+
+class StdioSessionServer(BaseSessionServer):
+    """Manages a stdio server process for a specific session."""
+
+    def __init__(self, server_config: McpServer, server_slug: str, session_id: str):
+        super().__init__(server_config, server_slug, session_id)
+        self._server_stderr_output: str | None = None
+
+    @property
+    def output(self) -> str | None:
+        """Returns the captured stderr output from the MCP server process."""
+        return self._server_stderr_output
+
+    async def start(self) -> None:
+        """Start the server process in a separate task."""
+        try:
+            server_params = StdioServerParameters(
+                command=str(self._server_config.command),
+                args=self._server_config.args,
+                env=self._server_config.env,
+            )
+
+            self._run_task = asyncio.create_task(self._run_server(server_params))
+            self._run_task.add_done_callback(self._run_server_callback)
+
+        except Exception as e:
+            logger.error(
+                f"Error starting session {self._session_id}: {e}", exc_info=True
+            )
+            await self.stop()
+            raise
+
+    async def _run_server(self, server_params: StdioServerParameters) -> None:
+        """Run the local MCP server process."""
+        logger.info(f"Starting local MCP Server process for session {self._session_id}")
+        self._server_stderr_output = None
+        with tempfile.TemporaryFile(mode="w+b") as stderr_temp_binary:
+            stderr_temp = io.TextIOWrapper(stderr_temp_binary, encoding="utf-8")
+            try:
+                async with stdio_client(server_params, errlog=stderr_temp) as (
+                    read,
+                    write,
+                ):
+                    self._read_stream, self._write_stream = read, write
+                    await self._relay_messages()
+
+            except* Exception as eg:
+                for exception in eg.exceptions:
+                    logger.error(
+                        f"Unexpected error for session {self._session_id}: {exception}",
+                        exc_info=True,
+                    )
+            finally:
+                stderr_temp.seek(0)
+                self._server_stderr_output = stderr_temp.read()
+                logger.error(self._server_stderr_output)
+
+
+class StreamableHttpSessionServer(BaseSessionServer):
+    """Manages an HTTP connection to a shared streamable-http server for a specific session."""
+
+    @property
+    def output(self) -> str | None:
+        """Returns captured output from the server process, if any."""
+        return None
+
+    async def start(self) -> None:
+        """Start an HTTP session to the running server."""
+        try:
+            self._run_task = asyncio.create_task(self._run_http_session())
+            self._run_task.add_done_callback(self._run_server_callback)
+
+        except Exception as e:
+            logger.error(
+                f"Error starting HTTP session {self._session_id}: {e}", exc_info=True
+            )
+            await self.stop()
+            raise
+
+    async def _run_http_session(self) -> None:
+        """Connect to the streamable HTTP server and run the message relay."""
+        url = self._server_config.url
+        if not url:
+            raise ValueError("streamable-http transport requires a url in config")
+
+        logger.info(
+            f"Connecting to streamable HTTP server at {url} for session {self._session_id}"
+        )
+        try:
+            async with streamable_http_client(url) as (read, write, _):
+                self._read_stream, self._write_stream = read, write
+                await self._relay_messages()
+        except Exception as e:
+            logger.error(
+                f"Unexpected error for HTTP session {self._session_id}: {e}",
+                exc_info=True,
+            )

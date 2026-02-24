@@ -16,6 +16,8 @@ class McpServer:
     ):
         self.name = name
         self.type = server_config.get("type")
+        self.transport: str = server_config.get("transport", "stdio")
+        self.url: str | None = server_config.get("url")
         self.command: str = str(server_config.get("command"))
         self.args = server_config.get("args", [])
         self.env = server_config.get("env", {})
@@ -24,16 +26,30 @@ class McpServer:
                 self.env[key] = os.environ[key]
 
     @property
+    def is_streamable_http(self) -> bool:
+        """Whether this server uses streamable-http transport."""
+        return self.transport == "streamable-http"
+
+    @property
     def file_path(self) -> str | None:
         """Get the file path from args if available."""
         return self.args[0] if self.args and len(self.args) > 0 else None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the server model back to a dictionary."""
-        return {"type": self.type, "command": self.command, "args": self.args}
+        result: dict[str, Any] = {
+            "type": self.type,
+            "command": self.command,
+            "args": self.args,
+        }
+        if self.transport:
+            result["transport"] = self.transport
+        if self.url:
+            result["url"] = self.url
+        return result
 
     def __repr__(self) -> str:
-        return f"McpServer(name='{self.name}', type='{self.type}', command='{self.command}', args={self.args})"
+        return f"McpServer(name='{self.name}', type='{self.type}', transport='{self.transport}', command='{self.command}', args={self.args}, url='{self.url}')"
 
 
 class McpConfig:
