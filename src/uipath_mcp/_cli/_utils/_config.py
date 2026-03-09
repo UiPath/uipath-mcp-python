@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,19 @@ class McpConfig:
         """Check if mcp.json exists"""
         return os.path.exists(self.config_path)
 
+    @staticmethod
+    def validate_server_name(name: str) -> None:
+        """
+        Validate the server name.
+
+        The server name must only contain letters (a-z, A-Z), numbers (0-9), and hyphens (-).
+        Raises a ValueError if the name is invalid.
+        """
+        if not re.match(r"^[a-zA-Z0-9-]+$", name):
+            raise ValueError(
+                f'Invalid server name "{name}": only letters, numbers, and hyphens are allowed.'
+            )
+
     def _load_config(self) -> None:
         """Load and process MCP configuration."""
         try:
@@ -73,9 +87,10 @@ class McpConfig:
                 self._raw_config = json.load(f)
 
             servers_config = self._raw_config.get("servers", {})
-            self._servers = {
-                name: McpServer(name, config) for name, config in servers_config.items()
-            }
+            self._servers = {}
+            for name in servers_config.keys():
+                self.validate_server_name(name)
+                self._servers[name] = McpServer(name, servers_config[name])
 
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in {self.config_path}: {str(e)}")
