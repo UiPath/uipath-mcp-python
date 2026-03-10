@@ -197,7 +197,7 @@ class UiPathMcpRuntime:
                     raise UiPathMcpRuntimeError(
                         McpErrorCode.REGISTRATION_ERROR,
                         "Folder NOT FOUND. Invalid UIPATH_FOLDER_PATH environment variable.",
-                        "Please set the UIPATH_FOLDER_PATH or UIPATH_FOLDER_KEY environment variable.",
+                        f"The folder '{folder_path}' was not found. Please verify that UIPATH_FOLDER_PATH is set to a valid folder path, or use UIPATH_FOLDER_KEY instead.",
                         UiPathErrorCategory.USER,
                     )
 
