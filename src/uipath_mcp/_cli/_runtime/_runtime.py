@@ -38,6 +38,7 @@ from .._utils._config import McpServer
 from ._context import UiPathServerType
 from ._exception import McpErrorCode, UiPathMcpRuntimeError
 from ._session import BaseSessionServer, StdioSessionServer, StreamableHttpSessionServer
+from ._token_refresh import TokenRefresher
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -85,6 +86,7 @@ class UiPathMcpRuntime:
         self._http_stderr_drain_task: asyncio.Task[None] | None = None
         self._http_server_stderr_lines: list[str] = []
         self._uipath = UiPath()
+        self._token_refresher: TokenRefresher | None = None
         self._cleanup_done = False
 
         # Context fields from UiPathConfig
@@ -207,6 +209,8 @@ class UiPathMcpRuntime:
                 root_span.set_attribute("args", json.dumps(self._server.args))
                 root_span.set_attribute("span_type", "MCP Server")
                 bearer_token = self._uipath._config.secret
+                self._token_refresher = TokenRefresher(self._uipath)
+
                 self._signalr_client = SignalRClient(
                     signalr_url,
                     headers={
@@ -236,6 +240,7 @@ class UiPathMcpRuntime:
                 run_task = asyncio.create_task(self._signalr_client.run())
                 cancel_task = asyncio.create_task(self._cancel_event.wait())
                 self._keep_alive_task = asyncio.create_task(self._keep_alive())
+                self._token_refresher.start()
 
                 try:
                     # Wait for either the run to complete or cancellation
@@ -296,6 +301,9 @@ class UiPathMcpRuntime:
         self._cleanup_done = True
 
         await self._on_runtime_abort()
+
+        if self._token_refresher:
+            await self._token_refresher.stop()
 
         if self._keep_alive_task:
             self._keep_alive_task.cancel()
@@ -374,11 +382,11 @@ class UiPathMcpRuntime:
                 session_server: BaseSessionServer
                 if self._server.is_streamable_http:
                     session_server = StreamableHttpSessionServer(
-                        self._server, self.slug, session_id
+                        self._server, self.slug, session_id, self._uipath
                     )
                 else:
                     session_server = StdioSessionServer(
-                        self._server, self.slug, session_id
+                        self._server, self.slug, session_id, self._uipath
                     )
                 try:
                     await session_server.start()
