@@ -182,6 +182,7 @@ cython_debug/
 
 **/samples/**/.agent/
 **/samples/**/.claude/
+.claude/
 **/samples/**/AGENTS.md
 **/samples/**/CLAUDE.md
 **/samples/**/entry-points.json
