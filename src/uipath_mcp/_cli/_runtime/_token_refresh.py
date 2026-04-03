@@ -5,7 +5,7 @@ import time
 from enum import Enum
 
 import httpx
-from uipath._cli._auth._portal_service import PortalService
+from uipath._cli._auth._oidc_utils import OidcUtils
 from uipath._cli._auth._url_utils import build_service_url, resolve_domain
 from uipath._cli._auth._utils import get_auth_data, update_auth_file
 from uipath._utils._auth import parse_access_token
@@ -14,6 +14,7 @@ from uipath._utils.constants import ENV_UIPATH_ACCESS_TOKEN
 from uipath.platform import UiPath
 from uipath.platform.common import TokenData
 from uipath.platform.common._config import UiPathApiConfig
+from uipath.platform.identity import IdentityService
 
 logger = logging.getLogger(__name__)
 
@@ -172,12 +173,14 @@ class TokenRefresher:
         if not refresh_token:
             raise ValueError("No refresh_token found in .uipath/.auth.json")
 
-        def _do_refresh() -> TokenData:
-            with PortalService(domain=self._domain) as portal:
-                return portal.refresh_access_token(refresh_token)
+        auth_config = await OidcUtils.get_auth_config(self._domain)
+        client_id = auth_config["client_id"]
 
-        # run in a thread to avoid blocking
-        token_data = await asyncio.to_thread(_do_refresh)
+        identity_service = IdentityService(self._domain)
+        token_data = await identity_service.refresh_access_token_async(
+            refresh_token=refresh_token,
+            client_id=client_id,
+        )
 
         try:
             update_auth_file(token_data)
