@@ -244,9 +244,9 @@ IMPORTANT: Your response should only contain the complete function code as a cle
 
             workflow.add_conditional_edges(
                 "validator_agent",
-                lambda s: "builder_agent"
-                if should_continue_loop(s)
-                else "extractor_agent",
+                lambda s: (
+                    "builder_agent" if should_continue_loop(s) else "extractor_agent"
+                ),
             )
 
             # Compile the graph

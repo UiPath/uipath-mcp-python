@@ -186,3 +186,5 @@ cython_debug/
 **/samples/**/CLAUDE.md
 **/samples/**/entry-points.json
 **/samples/**/uv.lock
+
+.claude/
