@@ -359,9 +359,9 @@ Begin generating the commit data now, based on the most recent suggestion, revie
             # If command is "commit", go to developer_node
             workflow.add_conditional_edges(
                 "hydrate_history",
-                lambda input: (
-                    "developer_node" if input.command == "commit" else "reviewer_node"
-                ),
+                lambda input: "developer_node"
+                if input.command == "commit"
+                else "reviewer_node",
                 {
                     "developer_node": "developer_node",
                     "reviewer_node": "reviewer_node",
