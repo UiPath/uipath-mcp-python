@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 cleanup() {
     echo "Cleaning up..."
@@ -49,10 +50,8 @@ echo "Waiting a moment for server to initialize..."
 sleep 20
 
 echo "Running integration test..."
-MCP_SERVER_NAME="$MCP_SERVER_NAME" uv run test.py
-
-# Capture test exit code
-TEST_EXIT_CODE=$?
+TEST_EXIT_CODE=0
+MCP_SERVER_NAME="$MCP_SERVER_NAME" uv run test.py || TEST_EXIT_CODE=$?
 
 echo "====== MCP Server Output ======"
 cat mcp_server_output.log
