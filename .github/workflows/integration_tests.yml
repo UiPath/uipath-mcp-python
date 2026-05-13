@@ -5,6 +5,14 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  # pull_request_target runs in the base-branch context and exposes secrets,
+  # which is required for Dependabot PRs (regular pull_request events do not
+  # receive repository secrets when triggered by Dependabot). The actor gate
+  # below restricts this trigger to Dependabot to avoid handing secrets to
+  # arbitrary fork PRs.
+  pull_request_target:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -13,12 +21,18 @@ permissions:
 
 jobs:
   discover-testcases:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     runs-on: ubuntu-latest
     outputs:
       testcases: ${{ steps.discover.outputs.testcases }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
     - name: Discover testcases
       id: discover
@@ -43,24 +57,44 @@ jobs:
       fail-fast: false
       matrix:
         testcase: ${{ fromJson(needs.discover-testcases.outputs.testcases) }}
-        environment: [alpha, cloud] # temporary disable staging
+        # Dependabot runs are restricted to alpha to minimize blast radius of
+        # exposing credentials to dependency-bump PRs.
+        environment: ${{ github.event_name == 'pull_request_target' && fromJson('["alpha"]') || fromJson('["alpha", "cloud"]') }}
 
     name: "${{ matrix.testcase }} / ${{ matrix.environment }}"
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
     - name: Install dependencies
       run: uv sync
 
+    - name: Check secrets availability
+      env:
+        CLIENT_ID:     ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_ID }}
+        CLIENT_SECRET: ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_SECRET || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_SECRET }}
+        BASE_URL:      ${{ matrix.environment == 'alpha' && secrets.ALPHA_BASE_URL || matrix.environment == 'cloud' && secrets.CLOUD_BASE_URL }}
+        PR_ACTOR:      ${{ github.event.pull_request.user.login }}
+      run: |
+        missing=()
+        [ -z "$CLIENT_ID" ] && missing+=("CLIENT_ID")
+        [ -z "$CLIENT_SECRET" ] && missing+=("CLIENT_SECRET")
+        [ -z "$BASE_URL" ] && missing+=("BASE_URL")
+
+        if [ ${#missing[@]} -gt 0 ]; then
+          echo "::warning::Missing or empty secrets for ${{ matrix.environment }}: ${missing[*]}. PRs from forks or Dependabot do not receive repository secrets unless configured in Settings → Secrets and variables → Dependabot — workflows triggered by '$PR_ACTOR' need those mirrored, or be re-run by a maintainer from a branch in this repo. Without them, the testcase will fail with a misleading auth error downstream."
+        fi
+
     - name: Run testcase
       env:
-        UIPATH_TENANT_ID:  ${{ matrix.environment == 'alpha' && secrets.ALPHA_TENANT_ID || matrix.environment == 'staging' && secrets.STAGING_TENANT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TENANT_ID }}
-        UIPATH_FOLDER_KEY: ${{ matrix.environment == 'alpha' && secrets.ALPHA_FOLDER_KEY || matrix.environment == 'staging' && secrets.STAGING_FOLDER_KEY || matrix.environment == 'cloud' && secrets.CLOUD_FOLDER_KEY }}
-        CLIENT_ID:         ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_ID || matrix.environment == 'staging' && secrets.STAGING_TEST_CLIENT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_ID }}
-        CLIENT_SECRET:     ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_SECRET || matrix.environment == 'staging' && secrets.STAGING_TEST_CLIENT_SECRET || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_SECRET }}
-        BASE_URL:          ${{ matrix.environment == 'alpha' && secrets.ALPHA_BASE_URL || matrix.environment == 'staging' && secrets.STAGING_BASE_URL || matrix.environment == 'cloud' && secrets.CLOUD_BASE_URL }}
+        UIPATH_TENANT_ID:  ${{ matrix.environment == 'alpha' && secrets.ALPHA_TENANT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TENANT_ID }}
+        UIPATH_FOLDER_KEY: ${{ matrix.environment == 'alpha' && secrets.ALPHA_FOLDER_KEY || matrix.environment == 'cloud' && secrets.CLOUD_FOLDER_KEY }}
+        CLIENT_ID:         ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_ID }}
+        CLIENT_SECRET:     ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_SECRET || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_SECRET }}
+        BASE_URL:          ${{ matrix.environment == 'alpha' && secrets.ALPHA_BASE_URL || matrix.environment == 'cloud' && secrets.CLOUD_BASE_URL }}
         GITHUB_PR_NUMBER:  ${{ github.event.pull_request.number }}
         GITHUB_RUN_ID:     ${{ github.run_number }}
       working-directory: testcases/${{ matrix.testcase }}
