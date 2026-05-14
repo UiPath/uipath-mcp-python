@@ -23,8 +23,8 @@ jobs:
   discover-testcases:
     if: |
       github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
-      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
+      (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     outputs:
       testcases: ${{ steps.discover.outputs.testcases }}
