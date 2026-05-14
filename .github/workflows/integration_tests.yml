@@ -73,6 +73,7 @@ jobs:
       run: uv sync
 
     - name: Check secrets availability
+      shell: bash
       env:
         CLIENT_ID:     ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_ID || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_ID }}
         CLIENT_SECRET: ${{ matrix.environment == 'alpha' && secrets.ALPHA_TEST_CLIENT_SECRET || matrix.environment == 'cloud' && secrets.CLOUD_TEST_CLIENT_SECRET }}
