@@ -1,4 +1,4 @@
-# UiPath MCP Python SDK
+# UiPath MCP Python SDK test copilot
 
 [![PyPI downloads](https://img.shields.io/pypi/dm/uipath-mcp.svg)](https://pypi.org/project/uipath-mcp/)
 [![PyPI - Version](https://img.shields.io/pypi/v/uipath-mcp)](https://img.shields.io/pypi/v/uipath-mcp)
