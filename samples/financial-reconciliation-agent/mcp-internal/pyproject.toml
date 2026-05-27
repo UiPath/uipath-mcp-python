@@ -1,0 +1,10 @@
+[project]
+name = "local-financial-reconciliation-mcp-server"
+version = "0.0.1"
+description = "Local MCP server for stripe agent"
+authors = [{ name = "Radu Mocanu" }]
+dependencies = [
+    "uipath-mcp>=0.0.84",
+    "uipath==2.0.56"
+]
+requires-python = ">=3.10"
