@@ -2,9 +2,12 @@ import asyncio
 import io
 import logging
 import tempfile
+import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
 
+from anyio import EndOfStream
 from mcp import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.message import SessionMessage
@@ -28,6 +31,18 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1
 
 
+@dataclass
+class SessionHealthInfo:
+    """Health information for a session, used by the watchdog."""
+
+    session_id: str
+    transport_type: str
+    task_done: bool
+    task_exception: BaseException | None
+    last_activity_time: float
+    queue_size: int
+
+
 class BaseSessionServer(ABC):
     """Base class with transport-agnostic message relay logic."""
 
@@ -48,8 +63,15 @@ class BaseSessionServer(ABC):
         self._active_requests: dict[str, str] = {}
         self._last_request_id: str | None = None
         self._last_message_id: str | None = None
+        self._last_activity_time: float = time.monotonic()
         self._uipath = uipath
         self._mcp_tracer = McpTracer(tracer, logger)
+
+    @property
+    @abstractmethod
+    def transport_type(self) -> str:
+        """Returns the transport type identifier (e.g. 'stdio', 'streamable-http')."""
+        ...
 
     @property
     @abstractmethod
@@ -79,8 +101,27 @@ class BaseSessionServer(ABC):
         self._read_stream = None
         self._write_stream = None
 
+    def get_health_info(self) -> SessionHealthInfo:
+        """Return health information for this session."""
+        task_done = self._run_task.done() if self._run_task else True
+        task_exception: BaseException | None = None
+        if task_done and self._run_task is not None:
+            try:
+                task_exception = self._run_task.exception()
+            except (asyncio.CancelledError, asyncio.InvalidStateError):
+                pass
+        return SessionHealthInfo(
+            session_id=self._session_id,
+            transport_type=self.transport_type,
+            task_done=task_done,
+            task_exception=task_exception,
+            last_activity_time=self._last_activity_time,
+            queue_size=self._message_queue.qsize(),
+        )
+
     async def on_message_received(self, request_id: str) -> None:
         """Get new incoming messages from UiPath MCP Server."""
+        self._last_activity_time = time.monotonic()
         for attempt in range(MAX_RETRIES + 1):
             try:
                 await self._get_messages_internal(request_id)
@@ -115,6 +156,7 @@ class BaseSessionServer(ABC):
                         break
 
                     session_message = await self._read_stream.receive()
+                    self._last_activity_time = time.monotonic()
                     if isinstance(session_message, Exception):
                         logger.error(f"Received error: {session_message}")
                         continue
@@ -137,6 +179,9 @@ class BaseSessionServer(ABC):
                         # For non-responses, use the last known request_id
                         if self._last_request_id is not None:
                             await self._send_message(message, self._last_request_id)
+                except EndOfStream:
+                    logger.warning(f"Read stream closed for session {self._session_id}")
+                    break
                 except Exception as e:
                     if session_message:
                         logger.info(session_message)
@@ -293,6 +338,10 @@ class StdioSessionServer(BaseSessionServer):
     _server_stderr_output: str | None = None
 
     @property
+    def transport_type(self) -> str:
+        return "stdio"
+
+    @property
     def output(self) -> str | None:
         """Returns the captured stderr output from the MCP server process."""
         return self._server_stderr_output
@@ -344,6 +393,10 @@ class StdioSessionServer(BaseSessionServer):
 
 class StreamableHttpSessionServer(BaseSessionServer):
     """Manages an HTTP connection to a shared streamable-http server for a specific session."""
+
+    @property
+    def transport_type(self) -> str:
+        return "streamable-http"
 
     @property
     def output(self) -> str | None:

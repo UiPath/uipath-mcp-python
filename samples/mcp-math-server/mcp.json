@@ -1,6 +1,6 @@
 {
   "servers": {
-    "math-server": {
+    "coded-math-mcp": {
         "transport": "stdio",
         "command": "python",
         "args": ["server.py"]
