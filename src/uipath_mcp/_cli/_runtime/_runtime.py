@@ -833,9 +833,20 @@ class UiPathMcpRuntime:
         """
         Check if the runtime is sandboxed (created on-demand for a single agent execution).
 
+        When ``UIPATH_MCP_CONTAINER_RUNTIME`` is set to a truthy value (``"1"``,
+        ``"true"``, or ``"yes"``, case-insensitive), the runtime is always treated as
+        long-lived (non-sandboxed) regardless of whether a job key is present.
+        AgentHub controls the container lifetime via an idle reaper instead.
+
         Returns:
             bool: True if this is an sandboxed runtime (has a job_id), False otherwise.
         """
+        if os.environ.get("UIPATH_MCP_CONTAINER_RUNTIME", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return False
         return self._job_id is not None
 
     @property
