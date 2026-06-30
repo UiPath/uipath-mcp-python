@@ -878,6 +878,14 @@ class UiPathMcpRuntime:
             # If it's a packaged runtime (has a process_key), it's a Coded server
             # Packaged runtimes are also sandboxed
             return UiPathServerType.Coded
+        elif os.environ.get("UIPATH_MCP_CONTAINER_RUNTIME", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            # AgentHub-orchestrated containers register against a Coded server;
+            # declare Coded so AgentHub does not reject the registration with 409.
+            return UiPathServerType.Coded
         elif self.sandboxed:
             # If it's sandboxed but not packaged, it's a Command server
             return UiPathServerType.Command

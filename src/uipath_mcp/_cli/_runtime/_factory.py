@@ -130,6 +130,35 @@ class UiPathMcpRuntimeFactory:
                     UiPathErrorCategory.USER,
                 )
 
+        # In container mode, UIPATH_RUNTIME_ID is set by AgentHub and must be
+        # honoured so AgentHub can correlate this runtime with the container it
+        # launched.  Override whatever was passed in (typically 'default') when
+        # the env-var holds a valid UUID.
+        container_runtime = os.environ.get(
+            "UIPATH_MCP_CONTAINER_RUNTIME", ""
+        ).lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if container_runtime:
+            env_runtime_id = os.environ.get("UIPATH_RUNTIME_ID", "")
+            try:
+                uuid.UUID(env_runtime_id)
+                if runtime_id != env_runtime_id:
+                    logger.info(
+                        "Container mode: overriding runtime_id '%s' with UIPATH_RUNTIME_ID '%s'",
+                        runtime_id,
+                        env_runtime_id,
+                    )
+                runtime_id = env_runtime_id
+            except ValueError:
+                logger.warning(
+                    "Container mode: UIPATH_RUNTIME_ID '%s' is not a valid UUID; keeping '%s'",
+                    env_runtime_id,
+                    runtime_id,
+                )
+
         # Validate runtime_id is a valid UUID, generate new one if not
         try:
             uuid.UUID(runtime_id)
