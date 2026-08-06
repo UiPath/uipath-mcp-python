@@ -13,12 +13,12 @@ permissions:
 
 jobs:
   discover-testcases:
-    runs-on: ubuntu-latest
+    runs-on: uipath-ubuntu-latest
     outputs:
       testcases: ${{ steps.discover.outputs.testcases }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
     - name: Discover testcases
       id: discover
@@ -35,7 +35,7 @@ jobs:
 
   integration-tests:
     needs: [discover-testcases]
-    runs-on: ubuntu-latest
+    runs-on: uipath-ubuntu-latest
     container:
       image: ghcr.io/astral-sh/uv:python3.12-bookworm
     strategy:
@@ -48,7 +48,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
     - name: Install dependencies
       run: uv sync
