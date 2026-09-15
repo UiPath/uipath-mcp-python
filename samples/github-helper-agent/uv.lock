@@ -3,8 +3,7 @@ revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
-    "python_full_version >= '3.12.4' and python_full_version < '3.14'",
-    "python_full_version < '3.12.4'",
+    "python_full_version < '3.14'",
 ]
 
 [options]
@@ -1001,16 +1000,14 @@ name = "github-helper-agent"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
-    { name = "langchain-mcp-adapters" },
     { name = "langgraph" },
     { name = "uipath-langchain" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "langchain-mcp-adapters", specifier = ">=0.1.9" },
     { name = "langgraph", specifier = ">=1.0.10" },
-    { name = "uipath-langchain", specifier = ">=0.0.118" },
+    { name = "uipath-langchain", specifier = ">=0.17.0" },
 ]
 
 [[package]]
@@ -1452,20 +1449,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cf/4e/41798c80b574d958d189e049f13d64eb9246a66623465290f2cbfd641759/langchain_google_genai-4.4.0.tar.gz", hash = "sha256:7871beec56ac07b719f77c46997845db6ff2267b817bffb0f97877053b0895d7", size = 378415, upload-time = "2026-09-01T20:15:45.816Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/10/83bb535e78c2cf767a6193c2f3b00b2894c1581a36ef85911ebaa3b9a891/langchain_google_genai-4.4.0-py3-none-any.whl", hash = "sha256:8e23a1307bd2158590bbf9d99f1d658fc84a9d9ddb77fb1b372f8875a2bafbbf", size = 81617, upload-time = "2026-09-01T20:15:44.533Z" },
-]
-
-[[package]]
-name = "langchain-mcp-adapters"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "langchain-core" },
-    { name = "mcp" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/5d/1f43b6a14cf448ea47bceb2860e9a6e3b0a911de0719aba43ed3eb927195/langchain_mcp_adapters-0.3.1.tar.gz", hash = "sha256:e08d4a74a0934d558ddb807ecbb8f89466c93a0d06c1fb58974b93b4703de01c", size = 47140, upload-time = "2026-07-27T18:36:45.792Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/8d/934946caf18559158678099ac00e6eed67d78e68c4e73c7afd01e19d31ec/langchain_mcp_adapters-0.3.1-py3-none-any.whl", hash = "sha256:1e354d9466db9fab9e30f24419adffbd39a84229e7f452927f99ea799e1937f9", size = 28877, upload-time = "2026-07-27T18:36:44.762Z" },
 ]
 
 [[package]]
@@ -3352,7 +3335,7 @@ wheels = [
 
 [[package]]
 name = "uipath"
-version = "2.14.15"
+version = "2.14.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "applicationinsights" },
@@ -3376,9 +3359,9 @@ dependencies = [
     { name = "uipath-platform" },
     { name = "uipath-runtime" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/f4/95a6c70d65a75d89dbb389c83a945eb228f5b9884e3bf080135fed7f2bc7/uipath-2.14.15.tar.gz", hash = "sha256:6d2779fc87addadc562dd43116709ddc92e80c9f176d6545c11639b62a4ca552", size = 4557182, upload-time = "2026-09-15T00:29:39.164Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/50/0735598528c78475cec3544b4dd9fe2679b64e7931eaf778bb1cdcec0f99/uipath-2.14.16.tar.gz", hash = "sha256:ffe44a2403e7eb1667ec736c4bf6d22548c4ff73473cceaf7a8a2aceebcb4baa", size = 4557258, upload-time = "2026-09-15T10:51:14.254Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/a1/6b8d1545276673bb03e70551f6cb14c96ed3e7aea1769462b5f29e3dff2c/uipath-2.14.15-py3-none-any.whl", hash = "sha256:c42380c395cd48685260dd5123b1f3fa1a2d587fa2860b4571e5af9f8be1a8a4", size = 442982, upload-time = "2026-09-15T00:29:37.385Z" },
+    { url = "https://files.pythonhosted.org/packages/69/7b/2f9c6c733abc28f8be001bb1b60ec5e45dd10681907d251956aabfb07cd5/uipath-2.14.16-py3-none-any.whl", hash = "sha256:7bd9d141a9f297ca1b842190d25dadb8563035dc09cce425f47a54c3fe6f32a2", size = 442993, upload-time = "2026-09-15T10:51:11.68Z" },
 ]
 
 [[package]]
