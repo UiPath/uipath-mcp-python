@@ -114,6 +114,7 @@ exclude-newer = "2 days"
 
 [tool.uv.exclude-newer-package]
 uipath = false
+uipath-mcp = false
 uipath-core = false
 uipath-platform = false
 uipath-runtime = false

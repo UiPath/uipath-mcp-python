@@ -16,6 +16,7 @@ exclude-newer-span = "P2D"
 uipath = false
 uipath-platform = false
 uipath-runtime = false
+uipath-mcp = false
 uipath-core = false
 
 [[package]]
