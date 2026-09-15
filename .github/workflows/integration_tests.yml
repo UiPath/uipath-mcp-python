@@ -11,6 +11,9 @@ permissions:
   pull-requests: write
   actions: read
 
+env:
+  SAFE_CHAIN_MINIMUM_PACKAGE_AGE_EXCLUSIONS: uipath,uipath-core,uipath-dev,uipath-langchain,uipath-mcp,uipath-platform,uipath-runtime
+
 jobs:
   discover-testcases:
     runs-on: uipath-ubuntu-latest
