@@ -1,3 +1,4 @@
+import importlib.metadata
 import os
 import shutil
 from typing import List, Optional, Tuple
@@ -84,7 +85,14 @@ def generate_files(target_directory: str, server_name: str):
         target_directory,
         "_templates/pyproject.toml.template",
         "pyproject.toml",
-        [("$project_name", server_name)],
+        [
+            ("$project_name", server_name),
+            # Floors at the installed releases: a Robot refuses a project on older
+            # uipath packages than it supports, so a scaffold never asks for less
+            # than the CLI that wrote it.
+            ("$uipath_mcp_version", importlib.metadata.version("uipath-mcp")),
+            ("$uipath_version", importlib.metadata.version("uipath")),
+        ],
     )
 
 

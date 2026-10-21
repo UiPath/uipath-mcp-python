@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Dynamic MCP Server with self-extending tools"
 authors = [{ name = "John Doe" }]
 dependencies = [
-    "uipath-mcp>=0.0.101",
+    "uipath-mcp>=0.3.1",
+    "uipath>=2.14.41",
 ]
 requires-python = ">=3.11"
