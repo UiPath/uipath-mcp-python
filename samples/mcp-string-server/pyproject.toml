@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "String Operations MCP Server"
 authors = [{ name = "John Doe" }]
 dependencies = [
-    "uipath-mcp>=0.1.1",
+    "uipath-mcp>=0.3.1",
+    "uipath>=2.14.41",
 ]
 requires-python = ">=3.11"

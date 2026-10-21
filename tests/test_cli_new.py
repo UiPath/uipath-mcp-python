@@ -47,6 +47,18 @@ def test_write_template_file_with_replacements(
     assert (target / "result.txt").read_text() == "name=svc; v=1"
 
 
+def test_generate_files_floors_at_the_installed_releases(tmp_path: Path):
+    """A Robot refuses a project on older uipath packages than it supports, so the
+    scaffold never asks for less than the CLI that wrote it."""
+    from importlib.metadata import version
+
+    cli_new.generate_files(str(tmp_path), "svc")
+    content = (tmp_path / "pyproject.toml").read_text()
+    assert f'"uipath-mcp>={version("uipath-mcp")}"' in content, content
+    assert f'"uipath>={version("uipath")}"' in content, content
+    assert "$" not in content, content
+
+
 def test_generate_files_calls_write_three_times(tmp_path: Path):
     with patch.object(cli_new, "write_template_file") as wtf:
         cli_new.generate_files(str(tmp_path), "svc")
