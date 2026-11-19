@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import json
 import logging
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -579,3 +580,41 @@ async def test_keep_alive_cancelled(runtime):
     ):
         with pytest.raises(asyncio.CancelledError):
             await runtime._keep_alive()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tool_attrs, expected",
+    [
+        # mcp 1.x: camelCase attribute
+        ({"inputSchema": {"type": "object"}}, {"type": "object"}),
+        # mcp 2.x: snake_case attribute, no camelCase one
+        ({"input_schema": {"type": "object", "x": 1}}, {"type": "object", "x": 1}),
+        # no schema at all -> empty object
+        ({"input_schema": None}, {}),
+        ({"inputSchema": None}, {}),
+    ],
+)
+async def test_register_accepts_both_input_schema_spellings(
+    runtime, tool_attrs, expected
+):
+    runtime._server.is_streamable_http = False
+    runtime._job_id = None
+    runtime._process_key = None
+    tool = SimpleNamespace(name="t", description="d", **tool_attrs)
+    session = MagicMock()
+    session.initialize = AsyncMock()
+    session.list_tools = AsyncMock(return_value=SimpleNamespace(tools=[tool]))
+    runtime._uipath.api_client.request_async = AsyncMock()
+    with (
+        patch(
+            f"{RMODULE}.stdio_client",
+            return_value=_FakeCM((MagicMock(), MagicMock())),
+        ),
+        patch(f"{RMODULE}.ClientSession", return_value=_FakeCM(session)),
+    ):
+        await runtime._register()
+    _args, kwargs = runtime._uipath.api_client.request_async.call_args
+    sent = kwargs["json"]["tools"][0]
+    assert sent["Name"] == "t"
+    assert json.loads(sent["InputSchema"]) == expected
