@@ -44,6 +44,18 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
+def _get_tool_input_schema(tool: Any) -> dict[str, Any] | None:
+    """Return a tool's JSON input schema.
+
+    ``mcp`` 1.x exposes it as ``Tool.inputSchema``; ``mcp`` 2.x renamed it to
+    ``Tool.input_schema``. Accept either so tool discovery does not depend on
+    which major version is installed.
+    """
+    if hasattr(tool, "inputSchema"):
+        return tool.inputSchema
+    return getattr(tool, "input_schema", None)
+
+
 class UiPathMcpRuntime:
     """A runtime class for hosting UiPath MCP servers.
 
@@ -690,13 +702,12 @@ class UiPathMcpRuntime:
             }
 
             for tool in tools_result.tools:
+                schema = _get_tool_input_schema(tool)
                 tool_info = {
                     "Name": tool.name,
                     "ProcessType": "Tool",
                     "Description": tool.description,
-                    "InputSchema": json.dumps(tool.inputSchema)
-                    if tool.inputSchema
-                    else "{}",
+                    "InputSchema": json.dumps(schema) if schema else "{}",
                 }
                 tools_list.append(tool_info)
 
